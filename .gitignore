@@ -1,0 +1,5 @@
+node_modules/
+.env*
+storage/app/images/*
+*.DS_Store
+.DS_Store

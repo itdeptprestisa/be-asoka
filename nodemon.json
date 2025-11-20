@@ -1,0 +1,6 @@
+{
+  "watch": ["src", "config", "entities", "controllers"],
+  "ext": "ts,js,json",
+  "ignore": ["src/**/*.spec.ts", "node_modules"],
+  "exec": "ts-node --transpile-only src/app.js"
+}

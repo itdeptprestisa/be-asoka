@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kartu Ucapan Prestisa</title>
+    <style>
+      @font-face {
+        font-family: "Nautilus";
+        src: url("/Nautilus.otf") format("truetype");
+      }
+      @font-face {
+        font-family: "Glacial";
+        src: url("/GlacialIndifferenceRegular.otf") format("truetype");
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1080px;
+        height: 720px;
+        font-family: Arial, sans-serif;
+      }
+      .card-container {
+        position: relative;
+        width: 1080px;
+        height: 720px;
+      }
+      .card-container img {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .greetings-text {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+
+        /* Flexbox centering */
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* vertical */
+        align-items: center; /* horizontal */
+
+        text-align: center;
+        color: #000;
+        padding: 0 40px; /* optional side padding */
+        box-sizing: border-box;
+      }
+      .greetings-text h2 {
+        margin: 0 0 20px;
+        font-size: 36px;
+        font-family: "Glacial", sans-serif;
+      }
+      .text-content {
+        font-family: "Nautilus", sans-serif;
+        font-size: 22px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        white-space: pre-wrap;
+      }
+      .greetings-text h3 {
+        margin: 20px 0 0;
+        font-size: 28px;
+        font-family: "Glacial", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card-container">
+      <img src="<%= logo %>" alt="Kartu Prestisa" />
+      <div class="greetings-text">
+        <h2>To : <%= receiver_name %></h2>
+        <span class="text-content"><%= greetings %></span>
+        <h3>From : <%= sender_name %></h3>
+      </div>
+    </div>
+  </body>
+</html>
