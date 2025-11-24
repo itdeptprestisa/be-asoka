@@ -52,7 +52,7 @@ export class OrderProblems extends BaseEntity {
   approved_at: Date | null;
 
   @Column({ type: "text", nullable: true })
-  complaint_category: Text | null;
+  complaint_category: string | null;
 
   @Column({ type: "varchar", nullable: true })
   payment_method_problem: String | null;
