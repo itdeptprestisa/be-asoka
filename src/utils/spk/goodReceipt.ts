@@ -21,7 +21,7 @@ async function processImage(base64, filename) {
   fs.writeFileSync(localPath, Buffer.from(base64Data, "base64"));
 
   await createImageJob({ src: localPath, dest: localPath });
-  // await sendToLavenderFtp(localPath, `/assets/images/good-receipt/${filename}`);
+  await sendToLavenderFtp(localPath, `/assets/images/good-receipt/${filename}`);
 
   return `/api/images/good-receipt/${filename}`;
 }
