@@ -117,7 +117,8 @@ export const searchPo = async (
       .innerJoinAndSelect("po.product", "product")
       .innerJoinAndSelect("po.orderData", "orderData")
       .where("po.id = :poId", { poId })
-      .andWhere("product.supplier_type = :type", { type: 4 })
+      .andWhere("product.supplier_type = :supplier_type", { supplier_type: 4 })
+      .andWhere("product.product_type = :product_type", { product_type: 2 })
       .andWhere("po.status IN (:...statuses)", {
         statuses: ["on progress"],
       })
@@ -948,6 +949,18 @@ export const goodReceipt = async (req: Request, res: Response) => {
       where: { id: spk_id },
     });
     if (!spk) throw new Error("SPK not found");
+
+    // 2.5) Jika SPK ada PO → update PO menjadi on progress
+    if (spk.po_id) {
+      const po = await queryRunner.manager.findOne(PurchaseOrder, {
+        where: { id: spk.po_id },
+      });
+
+      if (po) {
+        po.status = "on progress";
+        await queryRunner.manager.save(po);
+      }
+    }
 
     // 3) good receipt
     const existingGR = await queryRunner.manager.findOne(InventoryGoodReceived, {
