@@ -15,6 +15,7 @@ const publicRoutes = require("./public");
 const otherController = require("./other");
 const purchaseOrderController = require("./purchaseOrder");
 const inventoryRoutes = require("./inventory");
+const blueBirdLogisticRoutes = require("./bluebird_logistic");
 
 router.use("/auth", authRoutes);
 router.use("/user", authMiddleware, userRoutes);
@@ -29,5 +30,6 @@ router.use("/public", publicRoutes);
 router.use("/other", otherController);
 router.use("/purchase-order", purchaseOrderController);
 router.use("/inventory", authMiddleware, inventoryRoutes);
+router.use("/bluebird", blueBirdLogisticRoutes);
 
 module.exports = router;
