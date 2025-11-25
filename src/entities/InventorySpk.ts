@@ -48,8 +48,8 @@ export class InventorySpk extends BaseEntity {
     @Column({ nullable: true })
     status!: string;
 
-    @Column({ nullable: true })
-    receipt!: string;
+    // @Column({ nullable: true })
+    // receipt!: string;
 
     @OneToMany(() => InventorySpkProduct, (e) => e.spkData)
     inventoryProductData: InventorySpkProduct[];
