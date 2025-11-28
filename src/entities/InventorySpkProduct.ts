@@ -12,6 +12,7 @@ import {
 import { BaseEntity } from "./BaseEntity";
 import { Products } from "./Products";
 import { InventorySpk } from "./InventorySpk";
+import { InventoryGoodReceived } from "./InventoryGoodReceived";
 
 @Entity("inventory_spk_product")
 export class InventorySpkProduct extends BaseEntity {
@@ -41,5 +42,9 @@ export class InventorySpkProduct extends BaseEntity {
     @OneToOne(() => Products, (products) => products.spkProduct)
     @JoinColumn({ name: "product_id" })
     productsData: Products;
+
+    @OneToMany(() => InventoryGoodReceived, (e) => e.spkProduct)
+    @JoinColumn({ name: "spk_product_id" })
+    goodReceivedData: Products;
 
 }

@@ -54,15 +54,31 @@ export const searchProductEvent = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { keyword } = req.query;
+  const { keyword, product_id } = req.query;
 
   try {
     const keywordStr = keyword?.toString().trim();
+    const productIdNum = product_id ? Number(product_id) : null;
 
     // Ambil semua product_id yang ada di event
+    let eventProductIdsQuery: any = {};
+
+    // Jika product_id disediakan → filter langsung di event table
+    if (productIdNum) {
+      eventProductIdsQuery.where = { product_id: productIdNum };
+    }
+
     const eventProductIds = await dataSource
       .getRepository("ProductSupplierEvent")
-      .find({ select: ["product_id"] });
+      .find({
+        select: ["product_id"],
+        ...eventProductIdsQuery,
+      });
+
+    // Jika tidak ada event untuk product_id tertentu
+    if (eventProductIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
 
     const productIds = eventProductIds.map((e) => e.product_id);
 
@@ -86,7 +102,7 @@ export const searchProductEvent = async (
   } catch (err) {
     next(err);
   }
-}
+};
 
 export const searchPo = async (
   req: Request,
@@ -116,11 +132,13 @@ export const searchPo = async (
       .createQueryBuilder("po")
       .innerJoinAndSelect("po.product", "product")
       .innerJoinAndSelect("po.orderData", "orderData")
+      .innerJoinAndSelect("po.orderItemsData", "orderItemsData")
       .where("po.id = :poId", { poId })
       .andWhere("product.supplier_type = :supplier_type", { supplier_type: 4 })
-      .andWhere("product.product_type = :product_type", { product_type: 2 })
+      // .andWhere("product.product_type = :product_type", { product_type: 2 })
+      .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 })
       .andWhere("po.status IN (:...statuses)", {
-        statuses: ["on progress"],
+        statuses: ["pending"],
       })
       .getMany();
 
@@ -246,37 +264,70 @@ export const getSpkDetail = async (
     const spk = await dataSource
       .getRepository(InventorySpk)
       .createQueryBuilder("spk")
-      .leftJoinAndSelect("spk.inventoryProductData", "spkp")
-      .leftJoinAndSelect("spkp.productsData", "product")
       .leftJoinAndSelect("spk.suppliers", "supplier")
       .where("spk.id = :id", { id })
       .getOne();
-
-    const po = spk.po_id
-      ? await dataSource
-        .getRepository(PurchaseOrder)
-        .createQueryBuilder("po")
-        .leftJoinAndSelect("po.orderData", "orderData")
-        .where("po.id = :id", { id: spk.po_id })
-        .getOne()
-      : null;
 
     if (!spk) {
       return res.status(404).json({ success: false, message: "SPK not found" });
     }
 
+    const spkProducts = await dataSource
+      .getRepository(InventorySpkProduct)
+      .createQueryBuilder("spkp")
+      .leftJoinAndSelect("spkp.productsData", "product")
+      .where("spkp.spk_id = :id", { id })
+      .getMany();
+
+    const grRaw = await dataSource
+      .getRepository(InventoryGoodReceived)
+      .createQueryBuilder("gr")
+      .select("gr.spk_product_id", "spk_product_id")
+      .addSelect("SUM(gr.qty)", "total_qty")
+      .where("gr.spk_id = :spk_id", { spk_id: id })
+      .groupBy("gr.spk_product_id")
+      .getRawMany();
+
+    const grMap = new Map<number, number>();
+    grRaw.forEach((r) => {
+      grMap.set(Number(r.spk_product_id), Number(r.total_qty));
+    });
+
+    const formattedProducts = spkProducts.map((item) => {
+      const total_received_qty = grMap.get(item.id) || 0;
+      return {
+        ...item,
+        total_received_qty,
+        is_complete: total_received_qty >= Number(item.qty),
+      };
+    });
+
+    const spk_is_complete = formattedProducts.every((p) => p.is_complete);
+
+    const po = spk.po_id
+      ? await dataSource
+          .getRepository(PurchaseOrder)
+          .createQueryBuilder("po")
+          .leftJoinAndSelect("po.orderData", "orderData")
+          .where("po.id = :id", { id: spk.po_id })
+          .getOne()
+      : null;
+
     return res.json({
       success: true,
       data: {
         ...spk,
+        inventoryProductData: formattedProducts,
+        spk_is_complete,
         po: po
           ? {
-            ...po,
-            po_number: `${po.orderData.order_number}#${po.id}`
-          }
+              ...po,
+              po_number: `${po.orderData.order_number}#${po.id}`,
+            }
           : null,
       },
     });
+
   } catch (error) {
     next(error);
   }
@@ -385,16 +436,16 @@ export const stockMonitoringByProduct = async (
   next: NextFunction
 ) => {
   try {
-    const productId = parseInt(req.params.product_id, 10);
+    // const productId = parseInt(req.params.product_id, 10);
     const page = parseInt(req.query.page as string, 10) || 1;
     const perPage = parseInt(req.query.per_page as string, 10) || 10;
 
-    if (!productId) {
-      return res.status(400).json({
-        success: false,
-        message: "product_id is required",
-      });
-    }
+    // if (!productId) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "product_id is required",
+    //   });
+    // }
 
     const qb = dataSource
       .getRepository(InventorySpkProduct)
@@ -402,7 +453,7 @@ export const stockMonitoringByProduct = async (
       .leftJoinAndSelect("spk_product.productsData", "product")
       .leftJoinAndSelect("spk_product.spkData", "spk")
       .leftJoinAndSelect("spk.suppliers", "supplier")
-      .where("spk_product.product_id = :productId", { productId })
+      // .where("spk_product.product_id = :productId", { productId })
       .orderBy("spk_product.created_at", "DESC");
 
     const [spkProducts, total] = await qb
@@ -929,9 +980,9 @@ export const goodReceipt = async (req: Request, res: Response) => {
   const queryRunner = dataSource.createQueryRunner();
 
   try {
-    const { spk_id, receipt, completed_date } = req.body;
+    const { spk_id, spk_product_id, qty, receipt, completed_date } = req.body;
 
-    if (!spk_id || !receipt || !completed_date) {
+    if (!spk_id || !spk_product_id || !qty || !receipt || !completed_date) {
       return res.status(400).json({
         success: false,
         message: "Lengkapi Data",
@@ -941,109 +992,140 @@ export const goodReceipt = async (req: Request, res: Response) => {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
-    // 1) Upload image
-    const { img } = await uploadGoodReceipt(receipt, spk_id);
-
-    // 2) Ambil SPK
+    // Ambil SPK
     const spk = await queryRunner.manager.findOne(InventorySpk, {
       where: { id: spk_id },
     });
     if (!spk) throw new Error("SPK not found");
 
-    // 2.5) Jika SPK ada PO → update PO menjadi on progress
-    if (spk.po_id) {
-      const po = await queryRunner.manager.findOne(PurchaseOrder, {
-        where: { id: spk.po_id },
-      });
-
-      if (po) {
-        po.status = "on progress";
-        await queryRunner.manager.save(po);
-      }
-    }
-
-    // 3) good receipt
-    const existingGR = await queryRunner.manager.findOne(InventoryGoodReceived, {
-      where: { spk_id },
+    // Ambil SPK Product spesifik
+    const spkProduct = await queryRunner.manager.findOne(InventorySpkProduct, {
+      where: { id: spk_product_id },
     });
 
-    if (existingGR) {
+    if (!spkProduct) {
+      throw new Error("SPK Product tidak ditemukan");
+    }
+
+    // Cek total qty yang sudah masuk sebelumnya
+    const totalReceived = await queryRunner.manager.sum(
+      InventoryGoodReceived,
+      "qty",
+      { spk_product_id }
+    );
+
+    const existingQty = Number(totalReceived ?? 0);
+    const requestQty = Number(qty);
+    const allowedQty = Number(spkProduct.qty);
+
+    if (existingQty + requestQty > allowedQty) {
       await queryRunner.rollbackTransaction();
       return res.status(400).json({
         success: false,
-        message: "Good receipt sudah pernah dilakukan",
+        message: `Good receipt melebihi quantity.\nAllowed: ${allowedQty}, Existing: ${existingQty}, Request: ${requestQty}`,
       });
     }
 
-    // 4) get SPK Product
-    const spkProducts = await queryRunner.manager.find(InventorySpkProduct, {
-      where: { spk_id },
-    });
-
-    if (spkProducts.length === 0) {
-      throw new Error("SPK Product not found");
-    }
-
-    // 5) Insert good received
     const goodReceived = new InventoryGoodReceived();
     goodReceived.spk_id = spk_id;
+    goodReceived.spk_product_id = spk_product_id;
+    goodReceived.qty = requestQty;
     goodReceived.user_id = (req as any).user.userId;
-    goodReceived.receipt = img;
     goodReceived.completed_date = new Date(completed_date);
 
     await queryRunner.manager.save(goodReceived);
 
-    // 6) Proses semua SPK Product (update stok + stock event)
-    for (const item of spkProducts) {
-      const product = await queryRunner.manager.findOne(Products, {
-        where: { id: item.product_id },
+    const { img } = await uploadGoodReceipt(receipt, goodReceived.id);
+
+    goodReceived.receipt = img;
+    await queryRunner.manager.save(goodReceived);
+
+    if (spk.po_id) {
+      // 1. Ambil SPK Product (hanya 1 untuk SPK dengan PO)
+      const spkProduct = await queryRunner.manager.findOne(InventorySpkProduct, {
+        where: { id: spk_product_id },
       });
 
-      if (!product) throw new Error(`Product ID ${item.product_id} not found`);
+      if (!spkProduct) {
+        throw new Error("SPK Product not found");
+      }
 
-      const qty = Number(item.qty ?? 0);
+      const targetQty = Number(spkProduct.qty);
 
-      // update stok
-      product.stock_display = Number(product.stock_display) + qty;
-      product.stock_physical = Number(product.stock_physical) + qty;
-      await queryRunner.manager.save(product);
+      // 2. Hitung total qty good received untuk spk_product_id ini
+      const raw = await queryRunner.manager
+        .getRepository(InventoryGoodReceived)
+        .createQueryBuilder("gr")
+        .select("SUM(gr.qty)", "total_qty")
+        .where("gr.spk_product_id = :spk_product_id", { spk_product_id })
+        .getRawOne();
 
-      // simpan product dulu biar dapet nilai stock terbaru
-      await queryRunner.manager.save(product);
+      const totalReceived = Number(raw?.total_qty || 0);
 
-      // --- STOCK EVENT (PHYSICAL / TYPE 1) ---
-      const stockEventPhysical = new ProductStockEvent();
-      stockEventPhysical.product_id = item.product_id;
-      stockEventPhysical.user_id = (req as any).user.userId;
-      stockEventPhysical.supplier_id = spk.supplier_id;
-      stockEventPhysical.spk_id = spk.id;
-      stockEventPhysical.qty = qty;
-      stockEventPhysical.type = "plus";
-      stockEventPhysical.stock_type = 1; // PHYSICAL
-      stockEventPhysical.stock_left = product.stock_physical;
-      stockEventPhysical.remarks = "Good Receive — Physical Stock";
-      await queryRunner.manager.save(stockEventPhysical);
+      const isComplete = totalReceived >= targetQty;
 
-      // --- STOCK EVENT (DISPLAY / TYPE 2) ---
-      const stockEventDisplay = new ProductStockEvent();
-      stockEventDisplay.product_id = item.product_id;
-      stockEventDisplay.user_id = (req as any).user.userId;
-      stockEventDisplay.supplier_id = spk.supplier_id;
-      stockEventDisplay.spk_id = spk.id;
-      stockEventDisplay.qty = qty;
-      stockEventDisplay.type = "plus";
-      stockEventDisplay.stock_type = 2; // DISPLAY
-      stockEventDisplay.stock_left = product.stock_display;
-      stockEventDisplay.remarks = "Good Receive — Display Stock";
-      await queryRunner.manager.save(stockEventDisplay);
+      // 3. Jika qty sudah terpenuhi → update PO
+      if (isComplete) {
+        const po = await queryRunner.manager.findOne(PurchaseOrder, {
+          where: { id: spk.po_id },
+        });
+
+        if (po && po.status !== "on progress") {
+          po.status = "on progress";
+          await queryRunner.manager.save(po);
+        }
+      }
     }
 
-    // 7) Logs
+    // Update stok untuk product ini saja
+    const product = await queryRunner.manager.findOne(Products, {
+      where: { id: spkProduct.product_id },
+    });
+
+    if (!product) {
+      throw new Error(`Product ID ${spkProduct.product_id} not found`);
+    }
+
+    // update stok
+    product.stock_display = Number(product.stock_display) + requestQty;
+    product.stock_physical = Number(product.stock_physical) + requestQty;
+
+    await queryRunner.manager.save(product);
+
+    // Stock Event (Physical)
+    const stockEventPhysical = new ProductStockEvent();
+    stockEventPhysical.product_id = spkProduct.product_id;
+    stockEventPhysical.user_id = (req as any).user.userId;
+    stockEventPhysical.supplier_id = spk.supplier_id;
+    stockEventPhysical.spk_id = spk.id;
+    stockEventPhysical.qty = requestQty;
+    stockEventPhysical.type = "plus";
+    stockEventPhysical.stock_type = 1;
+    stockEventPhysical.stock_left = product.stock_physical;
+    stockEventPhysical.remarks = "Good Receipt — Physical Stock";
+    await queryRunner.manager.save(stockEventPhysical);
+
+    // Stock Event (Display)
+    const stockEventDisplay = new ProductStockEvent();
+    stockEventDisplay.product_id = spkProduct.product_id;
+    stockEventDisplay.user_id = (req as any).user.userId;
+    stockEventDisplay.supplier_id = spk.supplier_id;
+    stockEventDisplay.spk_id = spk.id;
+    stockEventDisplay.qty = requestQty;
+    stockEventDisplay.type = "plus";
+    stockEventDisplay.stock_type = 2;
+    stockEventDisplay.stock_left = product.stock_display;
+    stockEventDisplay.remarks = "Good Receipt — Display Stock";
+    await queryRunner.manager.save(stockEventDisplay);
+
+    // Logs
     const log = new Logs();
-    log.name = `good_receipt_${spk.id}`;
+    log.name = `good_receipt_${spkProduct.id}`;
     log.data = JSON.stringify({
       user_id: (req as any).user?.userId ?? null,
       spk_id: spk.id,
+      spk_product_id,
+      qty: requestQty,
       receipt: img,
       completed_date,
       at: new Date().toISOString(),
@@ -1071,5 +1153,36 @@ export const goodReceipt = async (req: Request, res: Response) => {
     });
   } finally {
     await queryRunner.release();
+  }
+};
+
+export const getGoodReceive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const spk_id = Number(req.params.spk_id);
+    if (isNaN(spk_id)) {
+      return res.status(400).json({ success: false, message: "Invalid SPK ID" });
+    }
+
+    const goodReceive = await InventoryGoodReceived.find({
+      where: { spk_id },
+      relations: ["users", "spkProduct", "spkProduct.productsData"],
+      order: { id: "DESC" },
+    });
+
+    if (!goodReceive || goodReceive.length === 0) {
+      return res.status(404).json({ success: false, message: "Data not found" });
+    }
+
+    return res.json({
+      success: true,
+      data: goodReceive,
+    });
+
+  } catch (error) {
+    next(error);
   }
 };
