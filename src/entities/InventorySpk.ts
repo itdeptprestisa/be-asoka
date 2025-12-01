@@ -69,6 +69,6 @@ export class InventorySpk extends BaseEntity {
     @OneToMany(() => ProductStockEvent, (e) => e.spkData)
     stockEvent: ProductStockEvent[];
 
-    @OneToOne(() => InventoryGoodReceived, (e) => e.spkData)
+    @OneToMany(() => InventoryGoodReceived, (e) => e.spkData)
     goodReceived: InventoryGoodReceived[];
 }

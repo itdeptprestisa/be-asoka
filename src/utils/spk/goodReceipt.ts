@@ -26,15 +26,15 @@ async function processImage(base64, filename) {
   return `/api/images/good-receipt/${filename}`;
 }
 
-export async function uploadGoodReceipt(receipt: string, spk_id: any) {
+export async function uploadGoodReceipt(receipt: string, gr_id: any) {
   let img = receipt;
 
   if (receipt && receipt.includes("data:")) {
     img = await processImage(
       receipt,
       process.env.NODE_ENV === "production"
-        ? `spk_${spk_id}.png`
-        : `staging_spk_${spk_id}.png`
+        ? `spk_${gr_id}.png`
+        : `staging_spk_${gr_id}.png`
     );
   }
   return { img };
