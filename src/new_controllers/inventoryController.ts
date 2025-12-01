@@ -54,18 +54,33 @@ export const searchProductEvent = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { keyword, product_id } = req.query;
+  const { keyword, product_id, supplier_id } = req.query;
 
   try {
+    // Validasi supplier_id wajib diisi
+    if (!supplier_id) {
+      return res.status(400).json({
+        success: false,
+        message: "supplier_id is required"
+      });
+    }
+
     const keywordStr = keyword?.toString().trim();
     const productIdNum = product_id ? Number(product_id) : null;
+    const supplierIdNum = Number(supplier_id);
 
     // Ambil semua product_id yang ada di event
     let eventProductIdsQuery: any = {};
 
-    // Jika product_id disediakan → filter langsung di event table
-    if (productIdNum) {
-      eventProductIdsQuery.where = { product_id: productIdNum };
+    // Jika product_id atau supplier_id disediakan → filter langsung di event table
+    if (productIdNum || supplierIdNum) {
+      eventProductIdsQuery.where = {};
+      if (productIdNum) {
+        eventProductIdsQuery.where.product_id = productIdNum;
+      }
+      if (supplierIdNum) {
+        eventProductIdsQuery.where.supplier_id = supplierIdNum;
+      }
     }
 
     const eventProductIds = await dataSource
@@ -306,11 +321,11 @@ export const getSpkDetail = async (
 
     const po = spk.po_id
       ? await dataSource
-          .getRepository(PurchaseOrder)
-          .createQueryBuilder("po")
-          .leftJoinAndSelect("po.orderData", "orderData")
-          .where("po.id = :id", { id: spk.po_id })
-          .getOne()
+        .getRepository(PurchaseOrder)
+        .createQueryBuilder("po")
+        .leftJoinAndSelect("po.orderData", "orderData")
+        .where("po.id = :id", { id: spk.po_id })
+        .getOne()
       : null;
 
     return res.json({
@@ -321,9 +336,9 @@ export const getSpkDetail = async (
         spk_is_complete,
         po: po
           ? {
-              ...po,
-              po_number: `${po.orderData.order_number}#${po.id}`,
-            }
+            ...po,
+            po_number: `${po.orderData.order_number}#${po.id}`,
+          }
           : null,
       },
     });
@@ -1022,7 +1037,8 @@ export const goodReceipt = async (req: Request, res: Response) => {
       await queryRunner.rollbackTransaction();
       return res.status(400).json({
         success: false,
-        message: `Good receipt melebihi quantity.\nAllowed: ${allowedQty}, Existing: ${existingQty}, Request: ${requestQty}`,
+        message: `Good receipt melebihi quantity.`,
+        desc: `Allowed: ${allowedQty}, Existing: ${existingQty}, Request: ${requestQty}`
       });
     }
 
@@ -1172,11 +1188,7 @@ export const getGoodReceive = async (
       relations: ["users", "spkProduct", "spkProduct.productsData"],
       order: { id: "DESC" },
     });
-
-    if (!goodReceive || goodReceive.length === 0) {
-      return res.status(404).json({ success: false, message: "Data not found" });
-    }
-
+    
     return res.json({
       success: true,
       data: goodReceive,
