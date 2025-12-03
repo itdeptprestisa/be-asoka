@@ -20,12 +20,12 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           echo "[INFO] Triggering Deployment at $(date)"
-          curl -k -X GET "https://145.79.15.244:22165/hook?access_key=u76wQzPnLc0zADcQUwW5yYpFXG7sEa8vmgruMCqbQZhmpeJ7"
+          curl -k -X GET "https://145.79.15.244:22165/hook?access_key=CH0EX0OPLGIM7hdzUp9NqHfDiTYZ00LVeFLU0lXpOhGZ0rWR"
           echo "[SUCCESS] Deployment Triggered"
 
       - name: Deploy Asoka BE Staging
         if: github.ref == 'refs/heads/staging'
         run: |
           echo "[INFO] Triggering Deployment at $(date)"
-          curl -k -X GET "https://145.79.15.244:22165/hook?access_key=CH0EX0OPLGIM7hdzUp9NqHfDiTYZ00LVeFLU0lXpOhGZ0rWR"
+          curl -k -X GET "https://145.79.15.244:22165/hook?access_key=u76wQzPnLc0zADcQUwW5yYpFXG7sEa8vmgruMCqbQZhmpeJ7"
           echo "[SUCCESS] Deployment Triggered"
