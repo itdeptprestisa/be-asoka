@@ -54,7 +54,7 @@ export const searchProductEvent = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { keyword, product_id, supplier_id } = req.query;
+  const { keyword, product_id, supplier_id, product_type } = req.query;
 
   try {
     // Validasi supplier_id wajib diisi
@@ -68,6 +68,7 @@ export const searchProductEvent = async (
     const keywordStr = keyword?.toString().trim();
     const productIdNum = product_id ? Number(product_id) : null;
     const supplierIdNum = Number(supplier_id);
+    const productTypeNum = product_type ? Number(product_type) : null;
 
     // Ambil semua product_id yang ada di event
     let eventProductIdsQuery: any = {};
@@ -104,12 +105,31 @@ export const searchProductEvent = async (
       if (!isNaN(Number(keywordStr))) filters.push({ id: Number(keywordStr) });
     }
 
+    // Build where clause dengan product_type filter
+    const whereConditions = filters.length
+      ? filters.map((f) => {
+        const condition: any = { ...f, id: In(productIds) };
+        // Tambahkan filter product_type
+        if (productTypeNum === 2) {
+          condition.product_type = Equal(2);
+        } else if (productTypeNum !== null) {
+          condition.product_type = Not(Equal(2));
+        }
+        return condition;
+      })
+      : [
+        {
+          id: In(productIds),
+          ...(productTypeNum === 2
+            ? { product_type: Equal(2) }
+            : productTypeNum !== null
+              ? { product_type: Not(Equal(2)) }
+              : {}),
+        },
+      ];
+
     const products = await dataSource.getRepository(Products).find({
-      where: [
-        ...(filters.length
-          ? filters.map((f) => ({ ...f, id: In(productIds) }))
-          : [{ id: In(productIds) }]),
-      ],
+      where: whereConditions,
       take: 10,
     });
 
@@ -1188,7 +1208,7 @@ export const getGoodReceive = async (
       relations: ["users", "spkProduct", "spkProduct.productsData"],
       order: { id: "DESC" },
     });
-    
+
     return res.json({
       success: true,
       data: goodReceive,
