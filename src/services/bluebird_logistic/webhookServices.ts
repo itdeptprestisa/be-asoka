@@ -1,4 +1,5 @@
-import BluebirdBooking from "../../models/BluebirdBooking";
+// import BluebirdBooking from "../../models/BluebirdBooking";
+const BluebirdBooking = require("../../models/bluebirdBooking");
 
 export interface WebhookPayload {
   order_id: string;
