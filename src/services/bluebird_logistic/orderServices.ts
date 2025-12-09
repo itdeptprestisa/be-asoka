@@ -5,7 +5,7 @@ import {
   BLUEBIRD_LOGISTIC_API_ORDER_V3_URL,
 } from "../../utils/constants";
 
-const BluebirdBooking = require("../../models/BluebirdBooking");
+const BluebirdBooking = require("../../models/bluebirdBooking");
 
 interface OrderItem {
   quantity: number;
