@@ -21,7 +21,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
   const orderData: CreateOrderPayload = req.body;
 
-  const result = await createOrderService(orderData, accessToken);
+  const result = await createOrderService(orderData, accessToken, "Asoka");
 
   return res.status(201).json({
     data: result,
