@@ -5,6 +5,8 @@ import {
   BLUEBIRD_LOGISTIC_API_ORDER_V3_URL,
 } from "../../utils/constants";
 
+import BluebirdBooking from "../../models/BluebirdBooking";
+
 interface OrderItem {
   quantity: number;
   product_name: string;
@@ -45,9 +47,15 @@ export interface CancelOrderPayload {
 }
 
 interface CreateOrderResponse {
-  order_id?: string;
-  status?: string;
-  message?: string;
+  code: number;
+  result: {
+    order_id?: string;
+    message?: string;
+    distance: number;
+    price: number;
+    reference_no: string;
+    status?: "Order Created";
+  };
 }
 
 interface OrderDetailsResponse {
@@ -64,21 +72,52 @@ interface OrderDetailsResponse {
 export const createOrderService = async (
   orderData: CreateOrderPayload,
   accessToken: string,
+  createdBy: string,
   httpClient: AxiosInstance = axios
 ): Promise<CreateOrderResponse> => {
-  const response = await httpClient.post<CreateOrderResponse>(
-    BLUEBIRD_LOGISTIC_API_ORDER_V3_URL,
-    orderData,
-    {
-      headers: {
-        "Content-Type": "text/plain",
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-  console.log(response, "response");
+  try {
+    const response = await httpClient.post<CreateOrderResponse>(
+      BLUEBIRD_LOGISTIC_API_ORDER_V3_URL,
+      orderData,
+      {
+        headers: {
+          "Content-Type": "text/plain",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
 
-  return response.data;
+    console.log(response.data.code, "response.data.code");
+    if (response.data.code === 201) {
+      const orderDetails = response.data.result;
+
+      try {
+        await BluebirdBooking.create({
+          reference_no: orderDetails.reference_no,
+          bluebird_order_id: orderDetails.order_id,
+          order_status_id: 1,
+          order_status_description: orderDetails.status,
+          sender_name: orderData.customer_name,
+          receiver_name: orderData.contact_name || null,
+          driver_phone: orderData.customer_phone,
+          tracking_link: null,
+          delivery_status: "pending",
+          order_date: new Date(),
+          price: orderDetails.price || null,
+          created_by: createdBy,
+        });
+
+        console.log("BluebirdBooking record created successfully");
+      } catch (dbError) {
+        console.error("Failed to create BluebirdBooking record:", dbError);
+      }
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error creating order:", error);
+    throw error;
+  }
 };
 
 export const cancelOrderService = async (

@@ -26,8 +26,9 @@ const dataSource = new DataSource({
   synchronize: false,
   logging: true,
   entities: [__dirname + "/../entities/*.{js,ts}"],
-  migrations: [],
+  migrations: [__dirname + "/../migrations/*.{js,ts}"],
   subscribers: [],
+  migrationsTableName: "prestisa_typeorm_migrations",
 });
 
 export default dataSource;

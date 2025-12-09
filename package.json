@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon -r ts-node/register server.js",
     "staging": "cross-env NODE_ENV=staging node -r ts-node/register server.js",
-    "production": "cross-env NODE_ENV=production node -r ts-node/register server.js"
+    "production": "cross-env NODE_ENV=production node -r ts-node/register server.js",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:create": "typeorm-ts-node-commonjs migration:create",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/config/dataSource.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/config/dataSource.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/config/dataSource.ts"
   },
   "keywords": [],
   "author": "",
