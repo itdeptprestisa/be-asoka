@@ -118,7 +118,6 @@ export async function gojekBookingRequest(
   };
 
   if (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) {
-    await createLog("msk", "");
     if (
       allowedCategories.includes(po.productsData.category_id) &&
       orderItem.price < 500000 &&
@@ -126,7 +125,6 @@ export async function gojekBookingRequest(
         orderData.website === webParselia) &&
       orderItem.shipping_expedition === "GOJEK"
     ) {
-      console.log("masoooooooooooooooooooooooook");
       try {
         const res = await gojekRequestPickupHelper(data);
         return res;
@@ -137,14 +135,8 @@ export async function gojekBookingRequest(
         );
         return err.message;
       }
-    } else if (
-      // allowedCategories.includes(po.productsData.category_id) &&
-      // (orderData.website === webRangkaianBunga ||
-      //   orderData.website === webParselia) &&
-      orderItem.shipping_expedition === "GOCAR"
-    ) {
+    } else if (orderItem.shipping_expedition === "GOCAR") {
       try {
-        await createLog("kesini", "");
         const res = await gojekRequestPickupHelper(data);
         return res;
       } catch (err: any) {
@@ -156,8 +148,6 @@ export async function gojekBookingRequest(
       }
     }
   } else {
-    await createLog("gak", "");
-    console.log("keluaaaaaaaaaaaaaaaaaaaaaaar");
     return "Date time already expired";
   }
 }
