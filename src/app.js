@@ -6,6 +6,7 @@ const errorHandler = require("./middlewares/errorHandler");
 const app = express();
 const path = require("path");
 const { default: dataSource } = require("./config/dataSource");
+const gojekautoRequestPickup = require("./cron/gojekAutoRequestPickup");
 
 // Middlewares
 app.use(cors());
@@ -29,17 +30,20 @@ app.use((req, res, next) => {
 // ✅ Error handler - MUST come after all routes and 404 handler
 app.use(errorHandler);
 
+if (process.env.NODE_ENV === "production") {
+  gojekautoRequestPickup();
+}
+
 // ✅ Database initialization and server start - AFTER all middleware setup
 const moment = require("moment");
 const now = moment().format("DD-MM-YYYY HH:mm:ss");
 const PORT = process.env.PORT || 3000;
 
-const { initDB } = require("./models"); // sequelize
+// const { initDB } = require("./models"); // sequelize
 // require("./src/queue"); to activate redis
-
-(async () => {
-  await initDB();
-})();
+// (async () => {
+//   await initDB();
+// })();
 
 dataSource
   .initialize()

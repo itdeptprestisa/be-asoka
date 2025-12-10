@@ -16,6 +16,7 @@ import { Customer } from "./Customer";
 import { Products } from "./Products";
 import { InventorySpk } from "./InventorySpk";
 import { ProductStockEvent } from "./ProductStockEvent";
+import { GojekBooking } from "./GojekBooking";
 
 @Entity("purchase_order")
 export class PurchaseOrder extends BaseEntity {
@@ -366,4 +367,11 @@ export class PurchaseOrder extends BaseEntity {
 
   @OneToOne(() => ProductStockEvent, (e) => e.poData)
   stockEvent: ProductStockEvent[];
+
+  @OneToMany(() => GojekBooking, (booking) => booking.purchaseOrderData)
+  gojekBookingData: GojekBooking[];
+
+  @ManyToOne(() => Products, (product) => product.purchaseOrderData)
+  @JoinColumn({ name: "product_id" })
+  productsData: Products;
 }
