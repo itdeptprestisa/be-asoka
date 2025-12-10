@@ -296,7 +296,7 @@ export class Products extends BaseEntity {
   })
   variantAttribute: ProductAttribute[];
 
-  @OneToMany (() => ProductSupplierEvent, (event) => event.product)
+  @OneToMany(() => ProductSupplierEvent, (event) => event.product)
   productEvents: ProductSupplierEvent[];
 
   @OneToMany(() => PurchaseOrder, (po) => po.product)
@@ -307,5 +307,7 @@ export class Products extends BaseEntity {
 
   @OneToOne(() => ProductStockEvent, { eager: false })
   productStockEvent: ProductStockEvent;
-  
+
+  @OneToMany(() => PurchaseOrder, (po) => po.productsData)
+  purchaseOrderData: PurchaseOrder[];
 }

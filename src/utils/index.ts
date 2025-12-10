@@ -8,6 +8,367 @@ import * as ftp from "basic-ftp";
 import * as fs from "fs";
 import axios from "axios";
 
+export const haversineGreatCircleDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+  earthRadius: number = 6371
+): number => {
+  // Convert degrees to radians
+  const latFrom = (lat1 * Math.PI) / 180;
+  const lonFrom = (lon1 * Math.PI) / 180;
+  const latTo = (lat2 * Math.PI) / 180;
+  const lonTo = (lon2 * Math.PI) / 180;
+
+  const latDelta = latTo - latFrom;
+  const lonDelta = lonTo - lonFrom;
+
+  // Haversine formula
+  const a =
+    Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
+    Math.cos(latFrom) *
+      Math.cos(latTo) *
+      Math.sin(lonDelta / 2) *
+      Math.sin(lonDelta / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadius * c;
+};
+
+/**
+ * Generate a random point near given coordinates within specified radius
+ * @param lat Latitude of center point (in degrees)
+ * @param lng Longitude of center point (in degrees)
+ * @param radiusInMeters Radius in meters (default: 2000m = 2km)
+ * @returns Object with lat and lng of random point
+ */
+export const generateRandomPointNear = (
+  lat: number,
+  lng: number,
+  radiusInMeters: number = 2000
+): { lat: number; lng: number } => {
+  // Convert meters to degrees (approximate: 1° ≈ 111,320 meters at equator)
+  const radiusInDegrees = radiusInMeters / 111320;
+
+  // Generate random numbers between 0 and 1
+  const u = Math.random();
+  const v = Math.random();
+
+  // Generate random point within circle
+  const w = radiusInDegrees * Math.sqrt(u);
+  const t = 2 * Math.PI * v;
+
+  const x = w * Math.cos(t);
+  const y = w * Math.sin(t);
+
+  // Adjust x-coordinate for longitude (cosine of latitude)
+  const new_x = x / Math.cos((lat * Math.PI) / 180);
+
+  const newLat = lat + y;
+  const newLng = lng + new_x;
+
+  return { lat: newLat, lng: newLng };
+};
+
+// stub: implement your own whitelist check
+function whitelistHsm(): string[] {
+  return [
+    "template_foto_lokasi_prestisa_terbaru_v2_230724",
+    "template_foto_lokasi_terbaru_310124",
+    "konfirmasi_lokasi_rangkaianbunga_24062025",
+  ];
+}
+
+export async function gojekBookingRequest(
+  po: PurchaseOrder,
+  orderItem: OrderItems | null = null,
+  cron = false
+) {
+  await createLog("gojek_requested", "");
+
+  const allowedCategories = [55, 57, 58, 15, 89];
+  const orderData = await Order.findOne({
+    where: { id: po.order_id },
+    select: ["id", "website"],
+  });
+
+  const webRangkaianBunga = 17;
+  const webParselia = 5;
+
+  if (!orderItem) {
+    orderItem = await OrderItems.findOne({ where: { id: po.pr_id } });
+  }
+
+  const data = {
+    order_data: { po_id: po.id },
+    origin: {
+      contact_name: po.supplierData.name,
+      note: po.notes,
+      lat_lng: `${po.supplierData.latitude},${po.supplierData.longitude}`,
+    },
+    destination: {
+      note: "",
+      lat_lng: `${orderItem.pickup_lat},${orderItem.pickup_long}`,
+      contact_name: po.receiver_name,
+      phone: po.customerData.phone,
+      address: po.shipping_address,
+    },
+  };
+
+  if (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) {
+    await createLog("msk", "");
+    if (
+      allowedCategories.includes(po.productsData.category_id) &&
+      orderItem.price < 500000 &&
+      (orderData.website === webRangkaianBunga ||
+        orderData.website === webParselia) &&
+      orderItem.shipping_expedition === "GOJEK"
+    ) {
+      console.log("masoooooooooooooooooooooooook");
+      try {
+        const res = await gojekRequestPickupHelper(data);
+        return res;
+      } catch (err: any) {
+        await logError(
+          `gojek_request_pickup_error_po_id_${po.id}`,
+          err.message
+        );
+        return err.message;
+      }
+    } else if (
+      // allowedCategories.includes(po.productsData.category_id) &&
+      // (orderData.website === webRangkaianBunga ||
+      //   orderData.website === webParselia) &&
+      orderItem.shipping_expedition === "GOCAR"
+    ) {
+      try {
+        await createLog("kesini", "");
+        const res = await gojekRequestPickupHelper(data);
+        return res;
+      } catch (err: any) {
+        await logError(
+          `gocar_request_pickup_error_po_id_${po.id}`,
+          err.message
+        );
+        return err.message;
+      }
+    }
+  } else {
+    await createLog("gak", "");
+    console.log("keluaaaaaaaaaaaaaaaaaaaaaaar");
+    return "Date time already expired";
+  }
+}
+
+export async function sendNotifOutside(json: any): Promise<any> {
+  try {
+    const response = await axios.post(
+      "https://lotus.prestisa.id/lavenger-backend/public/api/save-hsm-message",
+      // emulate multipart/form-data
+      new URLSearchParams({ jsonData: JSON.stringify(json) }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (err: any) {
+    return {
+      success: false,
+      msg: err.message,
+    };
+  }
+}
+
+export async function waNotifHsmImageRb(
+  to: string,
+  templatename: string,
+  parameters: string[] = [],
+  imageUrl = "",
+  button = ""
+): Promise<any> {
+  if (!whitelistHsm().includes(templatename)) {
+    return false;
+  }
+
+  try {
+    const url = "https://api.nexmo.com/v1/messages";
+    const auth = "Bearer " + process.env.NEXMO_TOKEN;
+
+    const params = parameters.map((v) => ({
+      type: "text",
+      text: v,
+    }));
+
+    const requestBody: any = {
+      message_type: "custom",
+      to: phone62(to),
+      from: "62895416016478", // your WhatsApp business number
+      channel: "whatsapp",
+      custom: {
+        type: "template",
+        template: {
+          namespace: "3c41bda0_1204_4c5e_981d_1d48cc023e3d",
+          name: templatename,
+          language: {
+            policy: "deterministic",
+            code: "id",
+          },
+          components: [
+            {
+              type: "header",
+              parameters: [
+                {
+                  type: "image",
+                  image: { link: imageUrl },
+                },
+              ],
+            },
+            {
+              type: "body",
+              parameters: params,
+            },
+          ],
+        },
+      },
+    };
+
+    if (button) {
+      requestBody.custom.template.components.push({
+        type: "button",
+        sub_type: "url",
+        index: 1,
+        parameters: [
+          {
+            type: "text",
+            text: button,
+          },
+        ],
+      });
+    }
+
+    const response = await axios.post(url, requestBody, {
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    // optional: increment counter
+    // hsmCounter(templatename);
+
+    return response.data;
+  } catch (err: any) {
+    return {
+      success: false,
+      msg: err.message,
+    };
+  }
+}
+
+export async function waNotifHsmImage(
+  to: string,
+  templatename: string,
+  parameters: string[] = [],
+  imageUrl = "",
+  button = ""
+): Promise<any> {
+  if (!whitelistHsm().includes(templatename)) {
+    return false;
+  }
+
+  try {
+    const url = "https://api.nexmo.com/v1/messages";
+    const auth = "Bearer " + process.env.NEXMO_TOKEN; // your JWT token here
+
+    // format parameters
+    const params = parameters.map((v) => ({
+      type: "text",
+      text: v,
+    }));
+
+    const requestBody: any = {
+      message_type: "custom",
+      to: phone62(to),
+      from: "6281231828249", // your WhatsApp business number
+      channel: "whatsapp",
+      custom: {
+        type: "template",
+        template: {
+          namespace: "3c41bda0_1204_4c5e_981d_1d48cc023e3d",
+          name: templatename,
+          language: {
+            policy: "deterministic",
+            code: "id",
+          },
+          components: [
+            {
+              type: "header",
+              parameters: [
+                {
+                  type: "image",
+                  image: {
+                    link: imageUrl,
+                  },
+                },
+              ],
+            },
+            {
+              type: "body",
+              parameters: params,
+            },
+          ],
+        },
+      },
+    };
+
+    if (button) {
+      requestBody.custom.template.components.push({
+        type: "button",
+        sub_type: "url",
+        index: 1,
+        parameters: [
+          {
+            type: "text",
+            text: button,
+          },
+        ],
+      });
+    }
+
+    const response = await axios.post(url, requestBody, {
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    // optional: increment counter
+    // hsmCounter(templatename);
+
+    return response.data;
+  } catch (err: any) {
+    return {
+      success: false,
+      msg: err.message,
+    };
+  }
+}
+
+export function jabodetabekIds() {
+  const jabodetabek = [
+    1642903, 1642904, 1642905, 1642908, 1642909, 9849799, 6751097, 1648470,
+    1648471, 1649377, 6599302, 1625083, 9845480, 9849891,
+  ];
+  return jabodetabek;
+}
+
 export function maskOrder(orders) {
   return orders.map((order) => {
     if (order.customerData?.phone) {
@@ -272,6 +633,10 @@ import { Repository, QueryRunner } from "typeorm";
 import { Users } from "../entities/Users";
 import { RoleUser } from "../entities/RoleUser";
 import dayjs from "dayjs";
+import { PurchaseOrder } from "../entities/PurchaseOrder";
+import { OrderItems } from "../entities/OrderItems";
+import { Order } from "../entities/Order";
+import { gojekRequestPickupHelper } from "../new_controllers/gojekController";
 
 export async function saveEntity<T>(
   repo: Repository<T> | QueryRunner["manager"],
