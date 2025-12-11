@@ -3,6 +3,7 @@ const router = express.Router();
 // const geoController = require("../controllers/geoController");
 const controller = require("../new_controllers/gojekController");
 
+router.get("/booking-status", controller.bookingStatus);
 router.get("/shipping-estimation", controller.shippingEstimation);
 router.post("/price-estimation", controller.priceEstimation);
 router.post("/request-pickup-order", controller.requestPickupOrder);
