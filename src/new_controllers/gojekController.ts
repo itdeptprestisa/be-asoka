@@ -348,11 +348,11 @@ const avoidZeroPricingEstimation = async (
   }
 };
 
-export async function shippingEstimation(req: Request, res: Response) {
+export async function shippingEstimation(req: any, res: Response) {
   try {
     const data = await shippingEstimationService({
-      origin_latlng: req.body.origin_latlng,
-      destination_latlng: req.body.destination_latlng,
+      origin_latlng: req.query.origin_latlng,
+      destination_latlng: req.query.destination_latlng,
       token: req.header("X-PRSTS-Token") || "",
     });
 
