@@ -77,7 +77,7 @@ export const bookingStatus = async (
 
     if (response.status >= 200 && response.status < 300) {
       const allBookingData = await GojekBooking.find({
-        where: { store_order_id: req.body.po_id },
+        where: { store_order_id: req.query.po_id },
         order: { created_at: "DESC" },
       });
 
@@ -96,7 +96,7 @@ export const bookingStatus = async (
       payload: "",
     });
   } catch (err: any) {
-    await createLog(`error_gojek_order_status_${req.body.po_id}`, err.message);
+    await createLog(`error_gojek_order_status_${req.query.po_id}`, err.message);
     return res.status(400).json({
       success: false,
       message: err.message,
