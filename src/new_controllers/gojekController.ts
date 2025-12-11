@@ -28,6 +28,83 @@ const GOJEK_HEADERS = {
 };
 const GOJEK_URL = process.env.GOJEK_BASE_URL;
 
+export const bookingStatus = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  const expectedToken = "integration-prestisa-gojek-2025";
+
+  try {
+    const incomingToken = req.header("X-PRSTS-Token");
+
+    if (incomingToken !== expectedToken) {
+      return res
+        .status(401)
+        .json({ success: false, status: 401, message: "Unauthorized" });
+    }
+
+    const poData = await PurchaseOrder.findOne({
+      where: { id: req.query.po_id },
+    });
+    if (!poData) {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to find purchase order data",
+        data: [],
+      });
+    }
+
+    const bookingData = await GojekBooking.findOne({
+      where: { store_order_id: req.query.po_id },
+      order: { created_at: "DESC" },
+    });
+
+    if (!bookingData) {
+      return res.status(400).json({
+        success: false,
+        message: "Failed to find booking data",
+        data: [],
+      });
+    }
+
+    const response = await axios.get(
+      `${GOJEK_URL}/booking/orderno/${bookingData.booking_id}`,
+      {
+        headers: GOJEK_HEADERS,
+      }
+    );
+
+    if (response.status >= 200 && response.status < 300) {
+      const allBookingData = await GojekBooking.find({
+        where: { store_order_id: req.body.po_id },
+        order: { created_at: "DESC" },
+      });
+
+      return res.json({
+        success: true,
+        data: response.data,
+        history_data: allBookingData,
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error_message:
+        response.headers["Error-Message"] || JSON.stringify(response.data),
+      respon_header: response.headers,
+      payload: "",
+    });
+  } catch (err: any) {
+    await createLog(`error_gojek_order_status_${req.body.po_id}`, err.message);
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+      data: [],
+    });
+  }
+};
+
 export const priceEstimation = async (
   req: Request,
   res: Response
