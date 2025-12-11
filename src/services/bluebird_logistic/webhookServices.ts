@@ -26,6 +26,12 @@ export interface WebhookPayload {
 
 const updateBookingRecord = async (payload: WebhookPayload): Promise<void> => {
   try {
+    const existingBooking = await BluebirdBooking.findOne({
+      where: {
+        bluebird_order_id: payload.order_id,
+      },
+    });
+
     const bookingData = {
       bluebird_order_id: payload.order_id,
       order_status_id: payload.order_status_id,
@@ -45,14 +51,10 @@ const updateBookingRecord = async (payload: WebhookPayload): Promise<void> => {
       photo_receiver_2: payload.photo_receiver2 || null,
       delivery_status: payload.delivery_status || null,
       undelivery_reason: payload.undelivery_reason || null,
-      tracking_link: payload.tracking_link || null,
+      tracking_link: !payload.tracking_link
+        ? existingBooking.tracking_link
+        : payload.tracking_link,
     };
-
-    const existingBooking = await BluebirdBooking.findOne({
-      where: {
-        bluebird_order_id: payload.order_id,
-      },
-    });
 
     if (existingBooking) {
       await existingBooking.update(bookingData);
