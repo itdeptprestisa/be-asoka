@@ -88,14 +88,9 @@ export async function gojekBookingRequest(
 ) {
   await createLog("gojek_requested", "");
 
-  const allowedCategories = [55, 57, 58, 15, 89];
-  const orderData = await Order.findOne({
-    where: { id: po.order_id },
-    select: ["id", "website"],
-  });
-
   const webRangkaianBunga = 17;
   const webParselia = 5;
+  const allowedWebsites = [webRangkaianBunga, webParselia];
 
   if (!orderItem) {
     orderItem = await OrderItems.findOne({ where: { id: po.pr_id } });
@@ -118,13 +113,7 @@ export async function gojekBookingRequest(
   };
 
   if (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) {
-    if (
-      allowedCategories.includes(po.productsData.category_id) &&
-      orderItem.price < 500000 &&
-      (orderData.website === webRangkaianBunga ||
-        orderData.website === webParselia) &&
-      orderItem.shipping_expedition === "GOJEK"
-    ) {
+    if (orderItem.shipping_expedition === "GOJEK") {
       try {
         const res = await gojekRequestPickupHelper(data);
         return res;

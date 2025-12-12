@@ -30,9 +30,8 @@ app.use((req, res, next) => {
 // ✅ Error handler - MUST come after all routes and 404 handler
 app.use(errorHandler);
 
-if (process.env.NODE_ENV === "production") {
-  gojekautoRequestPickup();
-}
+// ✅ Cron Jobs
+gojekautoRequestPickup();
 
 // ✅ Database initialization and server start - AFTER all middleware setup
 const moment = require("moment");
