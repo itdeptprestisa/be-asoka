@@ -117,10 +117,7 @@ export async function gojekBookingRequest(
     },
   };
 
-  if (
-    (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) &&
-    allowedWebsites.includes(orderData.website)
-  ) {
+  if (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) {
     if (orderItem.shipping_expedition === "GOJEK") {
       try {
         const res = await gojekRequestPickupHelper(data);
