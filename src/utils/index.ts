@@ -88,11 +88,6 @@ export async function gojekBookingRequest(
 ) {
   await createLog("gojek_requested", "");
 
-  const orderData = await Order.findOne({
-    where: { id: po.order_id },
-    select: ["id", "website"],
-  });
-
   const webRangkaianBunga = 17;
   const webParselia = 5;
   const allowedWebsites = [webRangkaianBunga, webParselia];
