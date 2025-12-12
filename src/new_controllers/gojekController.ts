@@ -21,6 +21,7 @@ import { updateShippingGojek } from "../new_jobs/updateShippingGojek";
 import { Geo } from "../entities/Geo";
 import { ShippingCostEstimation } from "../entities/ShippingCostEstimation";
 import { ShippingCost } from "../entities/ShippingCost";
+import { getFarePriceEstimationService } from "../services/bluebird_logistic/fareServices";
 
 const GOJEK_HEADERS = {
   "Pass-Key": process.env.GOJEK_PARTNER_KEY,
@@ -251,35 +252,59 @@ export const priceEstimation = async (
       let dataPhase1: any = {};
 
       try {
-        dataPhase1 = await shippingEstimationService({
-          origin_latlng: gojek_payload.origin_latlng,
-          destination_latlng: gojek_payload.destination_latlng,
-          token: "integration-prestisa-gojek-2025",
-        });
-      } catch (error) {
-        dataPhase1 = { success: false };
-      }
+        if (req.body.shipping_method == "bluebird") {
+          const blueBirdResponse = await getFarePriceEstimationService(
+            {
+              pickup_lat: req.body.origin_lat,
+              pickup_lon: req.body.origin_lng,
+              dropoff_lat: req.body.destination_lat,
+              dropoff_lon: req.body.destination_lng,
+              service_type: "LOG",
+            },
+            ""
+          );
 
-      if (dataPhase1?.success === true) {
-        url = dataPhase1.url;
-        const pricings = [];
+          dataPhase1 = {
+            data: {
+              pricings: [
+                {
+                  final_price: blueBirdResponse.fare,
+                  logistic: "Blue Bird",
+                },
+              ],
+            },
+          };
+        } else {
+          dataPhase1 = await shippingEstimationService({
+            origin_latlng: gojek_payload.origin_latlng,
+            destination_latlng: gojek_payload.destination_latlng,
+            token: "integration-prestisa-gojek-2025",
+          });
 
-        for (const method of ["Instant", "SameDay", "InstantCar"]) {
-          if (dataPhase1.data && dataPhase1.data[method]) {
-            pricings.push({
-              final_price: dataPhase1.data[method].price?.total_price || 0,
-              logistic: dataPhase1.data[method].shipment_method || {
-                name: method,
+          if (dataPhase1?.success === true) {
+            url = dataPhase1.url;
+            const pricings = [];
+
+            for (const method of ["Instant", "SameDay", "InstantCar"]) {
+              if (dataPhase1.data && dataPhase1.data[method]) {
+                pricings.push({
+                  final_price: dataPhase1.data[method].price?.total_price || 0,
+                  logistic: dataPhase1.data[method].shipment_method || {
+                    name: method,
+                  },
+                });
+              }
+            }
+
+            dataPhase1 = {
+              data: {
+                pricings: pricings,
               },
-            });
+            };
           }
         }
-
-        dataPhase1 = {
-          data: {
-            pricings: pricings,
-          },
-        };
+      } catch (error) {
+        dataPhase1 = { success: false };
       }
 
       // Recursive handling with depth limit
@@ -495,14 +520,13 @@ export const bookingCancellation = async (req: Request, res: Response) => {
       order: { created_at: "DESC" },
     });
 
-    // Optional: add status filter like in Laravel comments
-    // if (!bookingData) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Not allowed to cancel purchase order",
-    //     data: []
-    //   });
-    // }
+    if (!bookingData) {
+      return res.status(400).json({
+        success: false,
+        message: "Not allowed to cancel purchase order",
+        data: [],
+      });
+    }
 
     const payload = { orderNo: bookingData?.booking_id };
 

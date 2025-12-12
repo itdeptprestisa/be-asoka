@@ -4,6 +4,11 @@ const authController = require("../new_controllers/bluebird_logistic/authControl
 const fareController = require("../new_controllers/bluebird_logistic/fareController");
 const orderController = require("../new_controllers/bluebird_logistic/orderController");
 const webhookController = require("../new_controllers/bluebird_logistic/webhookController");
+const blueBirdController = require("../new_controllers/blueBirdController");
+
+router.get("/booking-status", blueBirdController.bookingStatus);
+router.post("/request-pickup-order", blueBirdController.requestPickupOrder);
+router.post("/cancel-booking", blueBirdController.bookingCancellation);
 
 router.post("/auth/token", authController.getAccessToken);
 router.get("/fare/price-estimation", fareController.getFarePriceEstimation);

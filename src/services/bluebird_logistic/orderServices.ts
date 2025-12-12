@@ -37,7 +37,7 @@ export interface CreateOrderPayload {
   callback_url: string;
   order_date: string;
   contact_name: string;
-  order_items: OrderItem[];
+  order_items?: OrderItem[];
 }
 
 export interface CancelOrderPayload {
