@@ -101,6 +101,7 @@ export const searchProductEvent = async (
 
     if (keywordStr) {
       filters.push({ name: ILike(`%${keywordStr}%`) });
+      filters.push({ product_code: ILike(`%${keywordStr}%`) });
       if (!isNaN(Number(keywordStr))) filters.push({ id: Number(keywordStr) });
     }
 
