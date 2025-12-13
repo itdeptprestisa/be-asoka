@@ -108,14 +108,14 @@ export const searchProductEvent = async (
     // Build where clause TANPA filter product_type
     const whereConditions = filters.length
       ? filters.map((f) => ({
-          ...f,
-          id: In(productIds),
-        }))
+        ...f,
+        id: In(productIds),
+      }))
       : [
-          {
-            id: In(productIds),
-          },
-        ];
+        {
+          id: In(productIds),
+        },
+      ];
 
     const products = await dataSource.getRepository(Products).find({
       where: whereConditions,
@@ -137,34 +137,44 @@ export const searchPo = async (
     const { input } = req.query;
     if (!input) return res.json({ success: false, message: "Input required" });
 
-    let poId: number | null = null;
-
     const inputStr = input.toString().trim();
 
+    let poId: number | null = null;
+    let orderNumber: string | null = null;
+
     if (inputStr.includes("#")) {
-      // format: xxxx#poId
+      // format: order_number#poId
       const parts = inputStr.split("#");
+      orderNumber = parts[0];
       poId = Number(parts[1]);
-    } else if (!isNaN(Number(inputStr))) {
-      poId = Number(inputStr);
+    } else {
+      // input tanpa # -> cari berdasarkan order_number
+      orderNumber = inputStr;
     }
 
-    if (!poId) return res.json({ success: false, message: "Invalid input" });
-
-    const purchaseOrders = await dataSource
+    const qb = dataSource
       .getRepository(PurchaseOrder)
       .createQueryBuilder("po")
       .innerJoinAndSelect("po.product", "product")
       .innerJoinAndSelect("po.orderData", "orderData")
       .innerJoinAndSelect("po.orderItemsData", "orderItemsData")
-      .where("po.id = :poId", { poId })
-      .andWhere("product.supplier_type = :supplier_type", { supplier_type: 4 })
-      // .andWhere("product.product_type = :product_type", { product_type: 2 })
+      .where("product.supplier_type = :supplier_type", { supplier_type: 4 })
       .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 })
-      .andWhere("po.status IN (:...statuses)", {
-        statuses: ["pending"],
-      })
-      .getMany();
+      .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
+
+    // Jika ada poId, cari exact match
+    if (poId) {
+      qb.andWhere("po.id = :poId", { poId });
+    }
+
+    // Jika ada orderNumber, cari berdasarkan order_number dari relasi Order
+    if (orderNumber) {
+      qb.andWhere("orderData.order_number LIKE :orderNumber", {
+        orderNumber: `%${orderNumber}%`
+      });
+    }
+
+    const purchaseOrders = await qb.take(50).getMany();
 
     return res.json({
       success: true,
