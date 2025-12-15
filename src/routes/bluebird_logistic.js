@@ -6,6 +6,7 @@ const orderController = require("../new_controllers/bluebird_logistic/orderContr
 const webhookController = require("../new_controllers/bluebird_logistic/webhookController");
 const blueBirdController = require("../new_controllers/blueBirdController");
 
+router.get("/booking-monitoring", blueBirdController.bookingMonitoring);
 router.get("/booking-status", blueBirdController.bookingStatus);
 router.post("/request-pickup-order", blueBirdController.requestPickupOrder);
 router.post("/cancel-booking", blueBirdController.bookingCancellation);

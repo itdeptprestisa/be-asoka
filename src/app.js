@@ -31,10 +31,12 @@ app.use((req, res, next) => {
 app.use(errorHandler);
 
 // ✅ Cron Jobs
-gojekautoRequestPickup();
+// gojekautoRequestPickup();
+// blueBirdAutoRequestPickup();
 
 // ✅ Database initialization and server start - AFTER all middleware setup
 const moment = require("moment");
+const blueBirdAutoRequestPickup = require("./cron/blueBirdAutoRequestPickup");
 const now = moment().format("DD-MM-YYYY HH:mm:ss");
 const PORT = process.env.PORT || 3000;
 

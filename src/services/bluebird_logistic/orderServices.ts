@@ -4,6 +4,7 @@ import {
   BLUEBIRD_LOGISTIC_API_ORDER_V2_URL,
   BLUEBIRD_LOGISTIC_API_ORDER_V3_URL,
 } from "../../utils/constants";
+import { logError } from "../../utils";
 
 const BluebirdBooking = require("../../models/bluebirdBooking");
 
@@ -81,7 +82,7 @@ export const createOrderService = async (
       orderData,
       {
         headers: {
-          "Content-Type": "text/plain",
+          "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
       }
@@ -110,12 +111,14 @@ export const createOrderService = async (
         console.log("BluebirdBooking record created successfully");
       } catch (dbError) {
         console.error("Failed to create BluebirdBooking record:", dbError);
+        await logError("szss", dbError);
       }
     }
 
     return response.data;
   } catch (error) {
     console.error("Error creating order:", error);
+    await logError("kkk", error);
     throw error;
   }
 };

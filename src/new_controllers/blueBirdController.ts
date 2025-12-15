@@ -9,6 +9,55 @@ import {
   getOrderDetailsByReferenceService,
 } from "../services/bluebird_logistic/orderServices";
 import { createLog, logError } from "../utils";
+import { fetchAccessToken } from "../services/bluebird_logistic/authServices";
+import moment from "moment";
+
+export const bookingMonitoring = async (
+  req: any,
+  res: Response,
+  next: NextFunction
+) => {
+  const expectedToken = "integration-prestisa-blue-bird-2025";
+
+  try {
+    const incomingToken = req.header("X-PRSTS-Token");
+
+    if (incomingToken !== expectedToken) {
+      return res
+        .status(401)
+        .json({ success: false, status: 401, message: "Unauthorized" });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const perPage = Math.max(
+      1,
+      parseInt(req.query.per_page as string, 10) || 10
+    );
+    const skip = (page - 1) * perPage;
+
+    const totalCount = await BluebirdBooking.count();
+
+    const response = await BluebirdBooking.find({
+      order: { created_at: "DESC" },
+      skip,
+      take: perPage,
+      relations: ["purchaseOrderData"],
+    });
+
+    return res.json({
+      success: true,
+      data: response,
+      meta: {
+        page,
+        per_page: perPage,
+        total: totalCount,
+        total_pages: Math.ceil(totalCount / perPage),
+      },
+    });
+  } catch (err: any) {
+    next(err);
+  }
+};
 
 export const bookingStatus = async (
   req: any,
@@ -50,9 +99,11 @@ export const bookingStatus = async (
       });
     }
 
+    const tokenData = await fetchAccessToken();
+
     const response = await getOrderDetailsByReferenceService(
       bookingData.reference_no.toString(),
-      ""
+      tokenData.access_token
     );
 
     const allBookingData = await BluebirdBooking.find({
@@ -121,13 +172,15 @@ export const bookingCancellation = async (
       });
     }
 
+    const tokenData = await fetchAccessToken();
+
     const response = await cancelOrderService(
       {
-        order_id: poData.order_id.toString(),
-        reason_text: "Cancel by Prestisa",
-        reference_no: poData.id.toString(),
+        order_id: bookingData.bluebird_order_id,
+        reason_text: "Sakura order cancelled by Asoka system",
+        reference_no: bookingData.reference_no.toString(),
       },
-      ""
+      tokenData.access_token
     );
 
     if (response.code >= 200 && response.code < 300) {
@@ -188,31 +241,87 @@ export const requestPickupOrder = async (
       });
     }
 
+    //     {
+    //   "reference_no": "334217",
+    //   "pickup_latitude": -6.234629787158357,
+    //   "pickup_longitude": 106.90362127336211,
+    //   "pickup_address": "Jl. Betung Raya 293-290, RT.11/RW.5, Pd. Bambu, Kec. Duren Sawit, Kota Jakarta Timur, Daerah Khusus Ibukota Jakarta 13430",
+    //   "pickup_instruction": "Tolong diambil di Pos Satpam",
+    //   "dropoff_latitude": -6.245632,
+    //   "dropoff_longitude": 106.825462,
+    //   "dropoff_address": "Jl. Mampang Prapatan V, RT.9/RW.6, Mampang Prpt., Kec. Mampang Prpt., Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta 12790",
+    //   "customer_name": "Gregorius",
+    //   "customer_phone": "085208565832",
+    //   "customer_email": "email@email.com",
+    //   "weight": 1.1,
+    //   "height": 1.1,
+    //   "width": 1.1,
+    //   "length": 1.1,
+    //   "service_type": "LOG",
+    //     "contact_phone": "0883432424244",
+    //     "callback_url":"https://6328185b9a053ff9aab00e81.mockapi.io/rezaqalogistic",
+    //     "order_date": "2025-12-15T03:35:00+07:00",
+    //     "contact_name" : "Cobatestingocelot",
+    //         "order_items": [
+    //     {
+    //         "quantity": 10,
+    //         "product_name": "barang1",
+    //         "length": 1.5,
+    //         "width": 1.5,
+    //         "height": 1.5,
+    //         "weight": 1.5
+    //     },{
+    //         "quantity": 20,
+    //         "product_name": "barang2",
+    //         "length": 2,
+    //         "width": 2,
+    //         "height": 2,
+    //         "weight": 2
+    //     }
+    //   ]
+    // }
+
     const payload: CreateOrderPayload = {
       reference_no: po.id.toString(),
       pickup_latitude: po.pickup_lat,
       pickup_longitude: po.pickup_long,
       pickup_address: po.shipping_address,
-      pickup_instruction: "",
+      pickup_instruction: "Tidak ada",
       dropoff_latitude: parseFloat(po.orderItemsData.receiver_latitude),
       dropoff_longitude: parseFloat(po.orderItemsData.receiver_longitude),
       dropoff_address: po.orderItemsData.shipping_address,
       customer_name: po.customerData.name,
       customer_phone: po.customerData.phone,
       customer_email: po.customerData.email,
-      weight: po.productsData.weight || 5,
-      height: po.productsData.height || 10,
-      width: po.productsData.width,
-      length: po.productsData.length,
+      weight: po.productsData.weight * po.qty || 5,
+      height: po.productsData.height * po.qty || 10,
+      width: po.productsData.width * po.qty || 10,
+      length: po.productsData.length * po.qty || 10,
       service_type: "LOG",
       contact_phone: po.customerData.phone,
       callback_url:
         "https://6328185b9a053ff9aab00e81.mockapi.io/rezaqalogistic",
-      order_date: po.orderItemsData.date_time.toString(),
+      order_date: moment(po.date_time).utcOffset(7).toISOString(true),
       contact_name: po.orderItemsData.sender_name,
+      order_items: [
+        {
+          quantity: po.orderItemsData.qty,
+          product_name: po.product_name,
+          weight: po.productsData.weight || 5,
+          height: po.productsData.height || 10,
+          width: po.productsData.width || 10,
+          length: po.productsData.length || 10,
+        },
+      ],
     };
 
-    const response = await createOrderService(payload, "null", "Sakura");
+    const tokenData = await fetchAccessToken();
+    // console.log("first", JSON.stringify(payload), tokenData.access_token);
+    const response = await createOrderService(
+      payload,
+      tokenData.access_token,
+      "Sakura"
+    );
 
     if (response.code >= 200 && response.code < 300) {
       const data = response;

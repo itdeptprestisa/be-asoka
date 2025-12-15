@@ -11,9 +11,11 @@ export interface FareEstimationParams {
 }
 
 interface FareEstimationResponse {
-  fare?: number;
-  distance?: number;
-  duration?: number;
+  code?: number;
+  result?: {
+    distance?: number;
+    price?: number;
+  };
 }
 
 export const getFarePriceEstimationService = async (

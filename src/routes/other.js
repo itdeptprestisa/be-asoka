@@ -7,5 +7,6 @@ const upload = multer({ dest: "uploads/" });
 
 router.post("/test-ftp-file", upload.single("file"), controller.testFtpUpload);
 router.post("/post-log", controller.postLog);
+router.post("/shipping-price-estimation", controller.shippingPriceEstimation);
 
 module.exports = router;

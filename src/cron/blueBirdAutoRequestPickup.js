@@ -9,6 +9,9 @@ const { createLog } = require("../utils");
 const {
   createOrderService,
 } = require("../services/bluebird_logistic/orderServices");
+const {
+  fetchAccessToken,
+} = require("../services/bluebird_logistic/authServices");
 
 function blueBirdAutoRequestPickup() {
   console.log("blue_bird_auto_request_pickup_active");
@@ -16,6 +19,7 @@ function blueBirdAutoRequestPickup() {
   // run every 5 minutes
   cron.schedule("*/1 * * * *", async () => {
     await createLog("blue_bird_scheduler_start_request_order", "");
+    const tokenData = await fetchAccessToken();
 
     try {
       // find purchase orders within 90 minutes window
@@ -52,8 +56,10 @@ function blueBirdAutoRequestPickup() {
               pickup_longitude: po.pickup_long,
               pickup_address: po.shipping_address,
               pickup_instruction: "",
-              dropoff_latitude: po.orderItemsData.receiver_latitude,
-              dropoff_longitude: po.orderItemsData.receiver_longitude,
+              dropoff_latitude: parseFloat(po.orderItemsData.receiver_latitude),
+              dropoff_longitude: parseFloat(
+                po.orderItemsData.receiver_longitude
+              ),
               dropoff_address: po.orderItemsData.shipping_address,
               customer_name: po.customerData.name,
               customer_phone: po.customerData.phone,
@@ -69,7 +75,7 @@ function blueBirdAutoRequestPickup() {
               order_date: po.orderItemsData.date_time,
               contact_name: po.orderItemsData.sender_name,
             };
-            await createOrderService(payload, "null", "Sakura");
+            await createOrderService(payload, tokenData.access_token, "Sakura");
             await createLog(
               "blue_bird_scheduler_finish_request_order",
               JSON.stringify(po)

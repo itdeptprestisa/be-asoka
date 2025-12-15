@@ -5,8 +5,11 @@ import {
   Index,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
+  JoinColumn,
 } from "typeorm";
 import { BaseEntity } from "./BaseEntity";
+import { PurchaseOrder } from "./PurchaseOrder";
 
 @Entity({ name: "bluebird_booking" })
 export class BluebirdBooking extends BaseEntity {
@@ -83,4 +86,8 @@ export class BluebirdBooking extends BaseEntity {
 
   @Column({ type: "varchar", length: 100, nullable: true })
   created_by: string;
+
+  @OneToOne(() => PurchaseOrder, (po) => po.blueBirdBookingData)
+  @JoinColumn({ name: "reference_no" })
+  purchaseOrderData: PurchaseOrder;
 }

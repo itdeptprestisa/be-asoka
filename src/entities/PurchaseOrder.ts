@@ -17,6 +17,7 @@ import { Products } from "./Products";
 import { InventorySpk } from "./InventorySpk";
 import { ProductStockEvent } from "./ProductStockEvent";
 import { GojekBooking } from "./GojekBooking";
+import { BluebirdBooking } from "./BluebirdBooking";
 
 @Entity("purchase_order")
 export class PurchaseOrder extends BaseEntity {
@@ -374,4 +375,7 @@ export class PurchaseOrder extends BaseEntity {
   @ManyToOne(() => Products, (product) => product.purchaseOrderData)
   @JoinColumn({ name: "product_id" })
   productsData: Products;
+
+  @OneToOne(() => BluebirdBooking, (po) => po.purchaseOrderData)
+  blueBirdBookingData: PurchaseOrder;
 }
