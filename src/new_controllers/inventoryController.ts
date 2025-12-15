@@ -159,8 +159,8 @@ export const searchPo = async (
       .innerJoinAndSelect("po.orderData", "orderData")
       .innerJoinAndSelect("po.orderItemsData", "orderItemsData")
       .where("product.supplier_type = :supplier_type", { supplier_type: 4 })
-      .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 })
-      .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
+      .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 });
+      // .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
 
     // Jika ada poId, cari exact match
     if (poId) {
@@ -1100,16 +1100,16 @@ export const goodReceipt = async (req: Request, res: Response) => {
       const isComplete = totalReceived >= targetQty;
 
       // 3. Jika qty sudah terpenuhi → update PO
-      if (isComplete) {
-        const po = await queryRunner.manager.findOne(PurchaseOrder, {
-          where: { id: spk.po_id },
-        });
+      // if (isComplete) {
+      //   const po = await queryRunner.manager.findOne(PurchaseOrder, {
+      //     where: { id: spk.po_id },
+      //   });
 
-        if (po && po.status !== "on progress") {
-          po.status = "on progress";
-          await queryRunner.manager.save(po);
-        }
-      }
+      //   if (po && po.status !== "on progress") {
+      //     po.status = "on progress";
+      //     await queryRunner.manager.save(po);
+      //   }
+      // }
     }
 
     // Update stok untuk product ini saja
