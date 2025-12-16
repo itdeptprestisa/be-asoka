@@ -685,17 +685,23 @@ export async function gojekRequestPickupHelper(request: any) {
           destinationLatLong: request.destination.lat_lng,
           destinationAddress: request.destination.address,
           item:
-            orderItems
-              .map((oi) => oi.productsData?.productCategoryNewData?.name)
-              .filter(Boolean)
-              .join(", ") || "Produk Prestisa",
+            [
+              ...new Set(
+                orderItems
+                  .map((oi) => oi.productsData?.productCategoryNewData?.name)
+                  .filter(Boolean)
+              ),
+            ].join(", ") || "Produk Prestisa",
           storeOrderId: String(validPo.id),
           insuranceDetails: {
             applied: "true",
             fee: "2500",
             product_description:
-              orderItems.map((oi) => oi.productsData?.name).join(", ") ||
-              "Produk Prestisa",
+              [
+                ...new Set(
+                  orderItems.map((oi) => oi.productsData?.name).filter(Boolean)
+                ),
+              ].join(", ") || "Produk Prestisa",
             product_price: String(sumPriceOrder),
           },
         },
