@@ -8,7 +8,11 @@ import {
   createOrderService,
   getOrderDetailsByReferenceService,
 } from "../services/bluebird_logistic/orderServices";
-import { createLog, logError } from "../utils";
+import {
+  createLog,
+  logError,
+  normalizeBlueBirdHistoryResponse,
+} from "../utils";
 import { fetchAccessToken } from "../services/bluebird_logistic/authServices";
 import moment from "moment";
 
@@ -111,10 +115,14 @@ export const bookingStatus = async (
       order: { created_at: "DESC" },
     });
 
+    const normalizedHistory = allBookingData.map((v) => {
+      return normalizeBlueBirdHistoryResponse(v);
+    });
+
     return res.json({
       success: true,
-      data: response,
-      history_data: allBookingData,
+      data: response, // raw Bluebird API response if you still want it
+      history_data: normalizedHistory, // normalized to your sample format
     });
   } catch (err: any) {
     await createLog(

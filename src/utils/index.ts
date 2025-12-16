@@ -8,6 +8,35 @@ import * as ftp from "basic-ftp";
 import * as fs from "fs";
 import axios from "axios";
 
+export function normalizeBlueBirdHistoryResponse(entity: BluebirdBooking) {
+  return {
+    id: entity.id, // primary key from your table
+    booking_id: entity.bluebird_order_id,
+    type: entity.order_status_id, // e.g. COMPLETED
+    event_id: null, // not in entity
+    booking_type: null, // not in entity
+    status: entity.delivery_status, // delivered, cancelled, etc.
+    status_code: entity.order_status_id,
+    destination_type: null,
+    vehicle_no: entity.vehicle_no,
+    driver_name: entity.driver_name,
+    driver_phone: entity.driver_phone,
+    total_distance_in_kms: null, // not in entity
+    delivery_eta: entity.event_time,
+    driver_photo_url: entity.photo_sender_1, // or whichever photo field you want
+    price: entity.price ? Number(entity.price) : null,
+    cancellation_reason: entity.undelivery_reason,
+    error_message: entity.note,
+    live_tracking_url: entity.tracking_link,
+    store_order_id: entity.reference_no?.toString(),
+    receiver_name: entity.receiver_name,
+    third_party_id: entity.signature_key,
+    created_at: entity.order_date?.toISOString(),
+    updated_at: entity.updated_at?.toISOString(),
+    deleted_at: null,
+  };
+}
+
 export const haversineGreatCircleDistance = (
   lat1: number,
   lon1: number,
@@ -616,6 +645,7 @@ import { PurchaseOrder } from "../entities/PurchaseOrder";
 import { OrderItems } from "../entities/OrderItems";
 import { Order } from "../entities/Order";
 import { gojekRequestPickupHelper } from "../new_controllers/gojekController";
+import { BluebirdBooking } from "../entities/BluebirdBooking";
 
 export async function saveEntity<T>(
   repo: Repository<T> | QueryRunner["manager"],
