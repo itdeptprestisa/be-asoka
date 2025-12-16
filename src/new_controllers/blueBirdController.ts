@@ -17,7 +17,7 @@ import { fetchAccessToken } from "../services/bluebird_logistic/authServices";
 import moment from "moment";
 
 export const bookingMonitoring = async (
-  req: any,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -25,13 +25,13 @@ export const bookingMonitoring = async (
 
   try {
     const incomingToken = req.header("X-PRSTS-Token");
-
     if (incomingToken !== expectedToken) {
       return res
         .status(401)
         .json({ success: false, status: 401, message: "Unauthorized" });
     }
 
+    // Pagination
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const perPage = Math.max(
       1,
@@ -39,18 +39,65 @@ export const bookingMonitoring = async (
     );
     const skip = (page - 1) * perPage;
 
-    const totalCount = await BluebirdBooking.count();
+    // Filters
+    const { status, date_start, date_end, keyword } = req.query;
 
-    const response = await BluebirdBooking.find({
-      order: { created_at: "DESC" },
-      skip,
-      take: perPage,
-      relations: ["purchaseOrderData"],
-    });
+    const qb = BluebirdBooking.createQueryBuilder("booking")
+      .leftJoinAndSelect("booking.purchaseOrderData", "purchaseOrderData")
+      .leftJoinAndSelect("purchaseOrderData.productsData", "productsData")
+      .leftJoinAndSelect(
+        "productsData.productCategoryNewData",
+        "productCategoryNewData"
+      )
+      .orderBy("booking.created_at", "DESC")
+      .skip(skip)
+      .take(perPage);
+
+    // ✅ Status filter (comma separated values)
+    if (status) {
+      const statusArray = (status as string).split(",").map((s) => s.trim());
+      qb.andWhere("booking.order_status_id IN (:...statusArray)", {
+        statusArray,
+      });
+    }
+
+    // ✅ Date range filter
+    if (date_start && date_end) {
+      qb.andWhere("booking.order_date BETWEEN :start AND :end", {
+        start: date_start,
+        end: date_end,
+      });
+    } else if (date_start) {
+      qb.andWhere("booking.order_date >= :start", { start: date_start });
+    } else if (date_end) {
+      qb.andWhere("booking.order_date <= :end", { end: date_end });
+    }
+
+    // ✅ Keyword filter (booking_id or po_id)
+    if (keyword) {
+      qb.andWhere(
+        "(booking.bluebird_order_id LIKE :kw OR booking.reference_no LIKE :kw)",
+        { kw: `%${keyword}%` }
+      );
+    }
+
+    const [response, totalCount] = await qb.getManyAndCount();
+
+    // ✅ Normalize response
+    const normalizedResponse = response.map((booking) => ({
+      ...booking,
+      purchaseOrderData: {
+        id: booking.purchaseOrderData?.id,
+        date_time: booking.purchaseOrderData?.date_time,
+        product_name: booking.purchaseOrderData?.productsData?.name,
+        category_name:
+          booking.purchaseOrderData?.productsData?.productCategoryNewData?.name,
+      },
+    }));
 
     return res.json({
       success: true,
-      data: response,
+      data: normalizedResponse,
       meta: {
         page,
         per_page: perPage,
