@@ -726,6 +726,13 @@ export async function gojekRequestPickupHelper(request: any) {
       });
 
       return { success: true, data };
+    } else {
+      await logError(
+        `error_gojek_booking_request_${
+          request?.order_data?.po_id || "unknown"
+        }`,
+        JSON.stringify(response)
+      );
     }
 
     return {
