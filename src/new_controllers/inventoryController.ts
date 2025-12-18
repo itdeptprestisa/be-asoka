@@ -54,7 +54,7 @@ export const searchProductEvent = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { keyword, product_id, supplier_id, product_type } = req.query;
+  const { keyword, product_id, supplier_id } = req.query;
 
   try {
     // Validasi supplier_id wajib diisi
@@ -68,7 +68,6 @@ export const searchProductEvent = async (
     const keywordStr = keyword?.toString().trim();
     const productIdNum = product_id ? Number(product_id) : null;
     const supplierIdNum = Number(supplier_id);
-    const productTypeNum = product_type ? Number(product_type) : null;
 
     // Ambil semua product_id yang ada di event
     let eventProductIdsQuery: any = {};
@@ -102,29 +101,19 @@ export const searchProductEvent = async (
 
     if (keywordStr) {
       filters.push({ name: ILike(`%${keywordStr}%`) });
+      filters.push({ product_code: ILike(`%${keywordStr}%`) });
       if (!isNaN(Number(keywordStr))) filters.push({ id: Number(keywordStr) });
     }
 
-    // Build where clause dengan product_type filter
+    // Build where clause TANPA filter product_type
     const whereConditions = filters.length
-      ? filters.map((f) => {
-        const condition: any = { ...f, id: In(productIds) };
-        // Tambahkan filter product_type
-        if (productTypeNum === 2) {
-          condition.product_type = Equal(2);
-        } else if (productTypeNum !== null) {
-          condition.product_type = Not(Equal(2));
-        }
-        return condition;
-      })
+      ? filters.map((f) => ({
+        ...f,
+        id: In(productIds),
+      }))
       : [
         {
           id: In(productIds),
-          ...(productTypeNum === 2
-            ? { product_type: Equal(2) }
-            : productTypeNum !== null
-              ? { product_type: Not(Equal(2)) }
-              : {}),
         },
       ];
 
@@ -148,34 +137,44 @@ export const searchPo = async (
     const { input } = req.query;
     if (!input) return res.json({ success: false, message: "Input required" });
 
-    let poId: number | null = null;
-
     const inputStr = input.toString().trim();
 
+    let poId: number | null = null;
+    let orderNumber: string | null = null;
+
     if (inputStr.includes("#")) {
-      // format: xxxx#poId
+      // format: order_number#poId
       const parts = inputStr.split("#");
+      orderNumber = parts[0];
       poId = Number(parts[1]);
-    } else if (!isNaN(Number(inputStr))) {
-      poId = Number(inputStr);
+    } else {
+      // input tanpa # -> cari berdasarkan order_number
+      orderNumber = inputStr;
     }
 
-    if (!poId) return res.json({ success: false, message: "Invalid input" });
-
-    const purchaseOrders = await dataSource
+    const qb = dataSource
       .getRepository(PurchaseOrder)
       .createQueryBuilder("po")
       .innerJoinAndSelect("po.product", "product")
       .innerJoinAndSelect("po.orderData", "orderData")
       .innerJoinAndSelect("po.orderItemsData", "orderItemsData")
-      .where("po.id = :poId", { poId })
-      .andWhere("product.supplier_type = :supplier_type", { supplier_type: 4 })
-      // .andWhere("product.product_type = :product_type", { product_type: 2 })
-      .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 })
-      .andWhere("po.status IN (:...statuses)", {
-        statuses: ["pending"],
-      })
-      .getMany();
+      .where("product.supplier_type = :supplier_type", { supplier_type: 4 })
+      .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 });
+      // .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
+
+    // Jika ada poId, cari exact match
+    if (poId) {
+      qb.andWhere("po.id = :poId", { poId });
+    }
+
+    // Jika ada orderNumber, cari berdasarkan order_number dari relasi Order
+    if (orderNumber) {
+      qb.andWhere("orderData.order_number LIKE :orderNumber", {
+        orderNumber: `%${orderNumber}%`
+      });
+    }
+
+    const purchaseOrders = await qb.take(50).getMany();
 
     return res.json({
       success: true,
@@ -1101,16 +1100,16 @@ export const goodReceipt = async (req: Request, res: Response) => {
       const isComplete = totalReceived >= targetQty;
 
       // 3. Jika qty sudah terpenuhi → update PO
-      if (isComplete) {
-        const po = await queryRunner.manager.findOne(PurchaseOrder, {
-          where: { id: spk.po_id },
-        });
+      // if (isComplete) {
+      //   const po = await queryRunner.manager.findOne(PurchaseOrder, {
+      //     where: { id: spk.po_id },
+      //   });
 
-        if (po && po.status !== "on progress") {
-          po.status = "on progress";
-          await queryRunner.manager.save(po);
-        }
-      }
+      //   if (po && po.status !== "on progress") {
+      //     po.status = "on progress";
+      //     await queryRunner.manager.save(po);
+      //   }
+      // }
     }
 
     // Update stok untuk product ini saja

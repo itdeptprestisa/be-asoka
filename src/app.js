@@ -41,7 +41,8 @@ const now = moment().format("DD-MM-YYYY HH:mm:ss");
 const PORT = process.env.PORT || 3000;
 
 // const { initDB } = require("./models"); // sequelize
-// require("./src/queue"); to activate redis
+// // require("./src/queue"); to activate redis
+
 // (async () => {
 //   await initDB();
 // })();
