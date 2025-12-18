@@ -1,3 +1,5 @@
+import { uploadLocationImage } from "../../new_jobs/uploadLocationImage";
+
 // import BluebirdBooking from "../../models/BluebirdBooking";
 const BluebirdBooking = require("../../models/bluebirdBooking");
 
@@ -58,6 +60,17 @@ const updateBookingRecord = async (payload: WebhookPayload): Promise<void> => {
 
     if (existingBooking) {
       await existingBooking.update(bookingData);
+      // avoid repetition
+      // if (
+      //   existingBooking.order_status_id != 5 &&
+      //   payload.order_status_id == "5"
+      // ) {
+      await uploadLocationImage({
+        po_id: Number(payload.reference_no),
+        courier: "BLUE BIRD",
+        img_location: payload.photo_receiver1 || payload.photo_receiver2,
+      });
+      // }
       console.log(`Updated booking record for order: ${payload.order_id}`);
     } else {
       await BluebirdBooking.create({
@@ -117,7 +130,6 @@ export const handleOrderWebhook = async (
         console.log("Order created:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "2":
         // Driver is picking up order
         console.log("Driver picking up order:", payload.order_id);
@@ -133,49 +145,41 @@ export const handleOrderWebhook = async (
         console.log("Unsuccessful:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "5":
         // Completed - all photos available
         console.log("Order completed:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "6":
         // Request Fleet - waiting for driver assignment
         console.log("Request fleet:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "7":
         // Cancel by Partner
         console.log("Order cancelled by partner:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "8":
         // Cancel by Operator
         console.log("Order cancelled by operator:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "9":
         // Hold
         console.log("Order on hold:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "10":
         // Cancel by System
         console.log("Order cancelled by system:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       case "12":
         // Complete Undelivered
         console.log("Order completed but undelivered:", payload.order_id);
         await updateBookingRecord(payload);
         break;
-
       default:
         console.log("Unknown status:", payload.order_status_id);
         await updateBookingRecord(payload);

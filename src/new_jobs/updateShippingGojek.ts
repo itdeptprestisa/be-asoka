@@ -51,7 +51,11 @@ export async function updateShippingGojek(request: any): Promise<void> {
         if (request.type === "COMPLETED") {
           // avoid repetition
           if (originalType !== "COMPLETED") {
-            await uploadLocationImage({ po_id: purchaseOrder.id });
+            await uploadLocationImage({
+              po_id: purchaseOrder.id,
+              courier: "GOJEK",
+              img_location: "",
+            });
           }
         }
       } catch (err: any) {

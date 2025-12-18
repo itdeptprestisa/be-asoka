@@ -5,15 +5,18 @@ import { WaWebhook } from "../entities/WaWebhook";
 import dayjs from "dayjs";
 import dataSource from "../config/dataSource";
 import axios from "axios";
+import * as fs from "fs";
 
 import {
   createLog,
   logError,
   saveEntity,
   sendNotifOutside,
+  sendToLavenderFtp,
   waNotifHsmImage,
   waNotifHsmImageRb,
 } from "../utils";
+import path from "path";
 
 // === Save Receipt to Lavender ===
 // Mirrors Laravel helper: always sends the API endpoint string in both POST URL and body["url"]
@@ -52,28 +55,56 @@ function logsFormatter(existingLog: string, newLog: any): string {
 }
 
 // === Main Service ===
-export async function uploadLocationImage(payload: { po_id: number }) {
+export async function uploadLocationImage(payload: {
+  po_id: number;
+  courier: "BLUE BIRD" | "GOJEK";
+  img_location: string;
+}) {
   const poRepo = dataSource.getRepository(PurchaseOrder);
   const poImageLogsRepo = dataSource.getRepository(PoImageLogs);
   const whatsappRepo = dataSource.getRepository(WaWebhook);
   const id = payload.po_id;
+  let imgpath = "";
 
   try {
     // Delivery Location Image (fallback to PO real_image)
-    const poData = await PurchaseOrder.findOne({
-      where: { id },
-      select: ["real_image"],
-    });
-    let imgpath = poData?.real_image;
+    if (payload.courier === "BLUE BIRD" && payload.img_location) {
+      const response = await axios.get(payload.img_location, {
+        responseType: "arraybuffer",
+      });
+
+      const fileName =
+        process.env.NODE_ENV === "production"
+          ? `po.${id}.png`
+          : `staging_po.${id}.png`;
+      imgpath = `/assets/images/delivery_location/${fileName}`;
+
+      const savePath = path.resolve("uploads", fileName);
+      fs.writeFileSync(savePath, response.data);
+      // const absoluteLocalPath = path.resolve(
+      //   "uploads",
+      //   path.basename(savePath)
+      // );
+
+      await sendToLavenderFtp(savePath, imgpath);
+    } else {
+      const poData = await PurchaseOrder.findOne({
+        where: { id },
+        select: ["real_image"],
+      });
+      poData?.real_image;
+
+      imgpath = poData?.real_image;
+    }
 
     // === Delivery Receipt ===
     const deliveryReceiptPath = `/assets/images/delivery_receipt/po.${id}.jpg`;
-    const okReceipt = await saveImageReceiptLavender(id);
+    // const okReceipt = await saveImageReceiptLavender(id);
 
-    if (!okReceipt) {
-      // throw new Error("Failed to save receipt image");
-      await createLog("Failed to save receipt image", `po_id_${id}`);
-    }
+    // if (!okReceipt) {
+    //   // throw new Error("Failed to save receipt image");
+    //   await createLog("Failed to save receipt image", `po_id_${id}`);
+    // }
 
     // === Update PurchaseOrder ===
     const poLog = await PurchaseOrder.findOne({ where: { id } });
@@ -109,61 +140,61 @@ export async function uploadLocationImage(payload: { po_id: number }) {
       relations: ["orderData", "orderData.customerData"],
     });
 
-    if (po) {
-      const websiteid = po.orderData.website;
-      const to = po.orderData.customerData.phone;
-      const customer = po.orderData.customerData.name;
-      const orderNumber = po.orderData.order_number;
-      const placeholders = [customer, orderNumber];
-      const imageUrl = `https://lavender.prestisa.id${po.delivery_location}`;
-      const buttonUrl = "https://notif.prestisa.com/";
+    // if (po) {
+    //   const websiteid = po.orderData.website;
+    //   const to = po.orderData.customerData.phone;
+    //   const customer = po.orderData.customerData.name;
+    //   const orderNumber = po.orderData.order_number;
+    //   const placeholders = [customer, orderNumber];
+    //   const imageUrl = `https://lavender.prestisa.id${po.delivery_location}`;
+    //   const buttonUrl = "https://notif.prestisa.com/";
 
-      let templatename = "";
-      let sendNotif: any;
+    //   let templatename = "";
+    //   let sendNotif: any;
 
-      if (websiteid === 1) {
-        templatename = "template_foto_lokasi_prestisa_terbaru_v2_230724";
-        sendNotif = await waNotifHsmImage(
-          to,
-          templatename,
-          placeholders,
-          imageUrl,
-          buttonUrl
-        );
-      } else if (websiteid === 8) {
-        templatename = "template_foto_lokasi_terbaru_310124";
-        sendNotif = {}; // ftw_hsm_image equivalent
-      } else if (websiteid === 17) {
-        templatename = "konfirmasi_lokasi_rangkaianbunga_24062025";
-        sendNotif = await waNotifHsmImageRb(to, templatename, [], imageUrl);
-      }
+    //   if (websiteid === 1) {
+    //     templatename = "template_foto_lokasi_prestisa_terbaru_v2_230724";
+    //     sendNotif = await waNotifHsmImage(
+    //       to,
+    //       templatename,
+    //       placeholders,
+    //       imageUrl,
+    //       buttonUrl
+    //     );
+    //   } else if (websiteid === 8) {
+    //     templatename = "template_foto_lokasi_terbaru_310124";
+    //     sendNotif = {}; // ftw_hsm_image equivalent
+    //   } else if (websiteid === 17) {
+    //     templatename = "konfirmasi_lokasi_rangkaianbunga_24062025";
+    //     sendNotif = await waNotifHsmImageRb(to, templatename, [], imageUrl);
+    //   }
 
-      await saveEntity(whatsappRepo, WaWebhook, {
-        msgfrom: "cs",
-        number: to,
-        body: `send from MITRA ${templatename} to ${to} | response : ${JSON.stringify(
-          sendNotif
-        )}`,
-        token: "foto_lokasi_hsm",
-        expired_at: dayjs().add(10, "minute").toDate(),
-        po_id: po?.id,
-      });
+    //   await saveEntity(whatsappRepo, WaWebhook, {
+    //     msgfrom: "cs",
+    //     number: to,
+    //     body: `send from MITRA ${templatename} to ${to} | response : ${JSON.stringify(
+    //       sendNotif
+    //     )}`,
+    //     token: "foto_lokasi_hsm",
+    //     expired_at: dayjs().add(10, "minute").toDate(),
+    //     po_id: po?.id,
+    //   });
 
-      const hsmRespon = sendNotif;
-      const json = {
-        from: websiteid === 17 ? "62895416016478" : "6281231828249",
-        to,
-        messageId: hsmRespon?.message_uuid,
-        messageText: `Foto Lokasi untuk PO ${po?.id}`,
-        contactName: customer,
-        fileName: `${po?.id}.png`,
-        token: "07d0b91e771752005d94ceb5c5efdc0a",
-        hsmName: templatename,
-        fileUrl: imageUrl,
-      };
+    //   const hsmRespon = sendNotif;
+    //   const json = {
+    //     from: websiteid === 17 ? "62895416016478" : "6281231828249",
+    //     to,
+    //     messageId: hsmRespon?.message_uuid,
+    //     messageText: `Foto Lokasi untuk PO ${po?.id}`,
+    //     contactName: customer,
+    //     fileName: `${po?.id}.png`,
+    //     token: "07d0b91e771752005d94ceb5c5efdc0a",
+    //     hsmName: templatename,
+    //     fileUrl: imageUrl,
+    //   };
 
-      await sendNotifOutside(json);
-    }
+    //   await sendNotifOutside(json);
+    // }
 
     return { success: true };
   } catch (err: any) {

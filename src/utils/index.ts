@@ -12,7 +12,7 @@ export function normalizeBlueBirdHistoryResponse(entity: BluebirdBooking) {
   return {
     id: entity.id, // primary key from your table
     booking_id: entity.bluebird_order_id,
-    type: entity.order_status_id, // e.g. COMPLETED
+    type: entity.order_status_description, // e.g. COMPLETED
     event_id: null, // not in entity
     booking_type: null, // not in entity
     status: entity.delivery_status, // delivered, cancelled, etc.

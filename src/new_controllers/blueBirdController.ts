@@ -152,10 +152,20 @@ export const bookingStatus = async (
 
     const tokenData = await fetchAccessToken();
 
-    const response = await getOrderDetailsByReferenceService(
-      bookingData.reference_no.toString(),
-      tokenData.access_token
-    );
+    let response: any = null;
+    try {
+      response = await getOrderDetailsByReferenceService(
+        bookingData.reference_no.toString(),
+        tokenData.access_token
+      );
+    } catch (apiErr: any) {
+      // log but don't fail the whole endpoint
+      await createLog(
+        `error_blue_bird_order_status_${req.query.po_id}`,
+        apiErr.message
+      );
+      response = null;
+    }
 
     const allBookingData = await BluebirdBooking.find({
       where: { reference_no: req.query.po_id },
@@ -296,46 +306,6 @@ export const requestPickupOrder = async (
       });
     }
 
-    //     {
-    //   "reference_no": "334217",
-    //   "pickup_latitude": -6.234629787158357,
-    //   "pickup_longitude": 106.90362127336211,
-    //   "pickup_address": "Jl. Betung Raya 293-290, RT.11/RW.5, Pd. Bambu, Kec. Duren Sawit, Kota Jakarta Timur, Daerah Khusus Ibukota Jakarta 13430",
-    //   "pickup_instruction": "Tolong diambil di Pos Satpam",
-    //   "dropoff_latitude": -6.245632,
-    //   "dropoff_longitude": 106.825462,
-    //   "dropoff_address": "Jl. Mampang Prapatan V, RT.9/RW.6, Mampang Prpt., Kec. Mampang Prpt., Kota Jakarta Selatan, Daerah Khusus Ibukota Jakarta 12790",
-    //   "customer_name": "Gregorius",
-    //   "customer_phone": "085208565832",
-    //   "customer_email": "email@email.com",
-    //   "weight": 1.1,
-    //   "height": 1.1,
-    //   "width": 1.1,
-    //   "length": 1.1,
-    //   "service_type": "LOG",
-    //     "contact_phone": "0883432424244",
-    //     "callback_url":"https://6328185b9a053ff9aab00e81.mockapi.io/rezaqalogistic",
-    //     "order_date": "2025-12-15T03:35:00+07:00",
-    //     "contact_name" : "Cobatestingocelot",
-    //         "order_items": [
-    //     {
-    //         "quantity": 10,
-    //         "product_name": "barang1",
-    //         "length": 1.5,
-    //         "width": 1.5,
-    //         "height": 1.5,
-    //         "weight": 1.5
-    //     },{
-    //         "quantity": 20,
-    //         "product_name": "barang2",
-    //         "length": 2,
-    //         "width": 2,
-    //         "height": 2,
-    //         "weight": 2
-    //     }
-    //   ]
-    // }
-
     const payload: CreateOrderPayload = {
       reference_no: po.id.toString(),
       pickup_latitude: po.pickup_lat,
@@ -354,8 +324,7 @@ export const requestPickupOrder = async (
       length: po.productsData.length * po.qty || 10,
       service_type: "LOG",
       contact_phone: po.customerData.phone,
-      callback_url:
-        "https://6328185b9a053ff9aab00e81.mockapi.io/rezaqalogistic",
+      callback_url: "",
       order_date: moment(po.date_time).utcOffset(7).toISOString(true),
       contact_name: po.orderItemsData.sender_name,
       order_items: [

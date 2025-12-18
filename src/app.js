@@ -14,6 +14,10 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
+// Handle JSON and Text Plain request body
+app.use(express.json());
+app.use(express.text());
+
 // Routes
 app.use("/api", routes);
 
@@ -21,6 +25,7 @@ app.use("/api", routes);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.resolve("uploads")));
 
 // ✅ 404 handler - MUST come after all routes
 app.use((req, res, next) => {
