@@ -82,7 +82,7 @@ export const createOrderService = async (
       orderData,
       {
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "text/plain",
           Authorization: `Bearer ${accessToken}`,
         },
       }
@@ -111,14 +111,14 @@ export const createOrderService = async (
         console.log("BluebirdBooking record created successfully");
       } catch (dbError) {
         console.error("Failed to create BluebirdBooking record:", dbError);
-        await logError("szss", dbError);
+        await logError("bluebird_request_pickup_error", dbError);
       }
     }
 
     return response.data;
   } catch (error) {
     console.error("Error creating order:", error);
-    await logError("kkk", error);
+    await logError("bluebird_request_pickup_error", error);
     throw error;
   }
 };
