@@ -324,7 +324,7 @@ export const requestPickupOrder = async (
       length: po.productsData.length * po.qty || 10,
       service_type: "LOG",
       contact_phone: po.customerData.phone,
-      callback_url: "",
+      callback_url: `${process.env.BE_ASOKA_BASE_URL}/bluebird/webhook`,
       order_date: moment(po.date_time).utcOffset(7).toISOString(true),
       contact_name: po.orderItemsData.sender_name,
       order_items: [
@@ -340,7 +340,6 @@ export const requestPickupOrder = async (
     };
 
     const tokenData = await fetchAccessToken();
-    // console.log("first", JSON.stringify(payload), tokenData.access_token);
     const response = await createOrderService(
       payload,
       tokenData.access_token,

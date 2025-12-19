@@ -70,10 +70,19 @@ function blueBirdAutoRequestPickup() {
               length: po.productsData.length,
               service_type: "LOG",
               contact_phone: po.customerData.phone,
-              callback_url:
-                "https://6328185b9a053ff9aab00e81.mockapi.io/rezaqalogistic",
+              callback_url: `${process.env.BE_ASOKA_BASE_URL}/bluebird/webhook`,
               order_date: po.orderItemsData.date_time,
               contact_name: po.orderItemsData.sender_name,
+              order_items: [
+                {
+                  quantity: po.orderItemsData.qty,
+                  product_name: po.product_name,
+                  weight: po.productsData.weight || 5,
+                  height: po.productsData.height || 10,
+                  width: po.productsData.width || 10,
+                  length: po.productsData.length || 10,
+                },
+              ],
             };
             await createOrderService(payload, tokenData.access_token, "Sakura");
             await createLog(
