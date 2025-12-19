@@ -245,8 +245,6 @@ export async function handleGojekProof(url: string, po_id: number) {
     // Prefer the second image if it exists, otherwise use the first
     if (imgSrcs.length >= 2) {
       proofImgSrc = imgSrcs[1];
-    } else if (imgSrcs.length === 1) {
-      proofImgSrc = imgSrcs[0];
     }
 
     if (proofImgSrc) {
@@ -264,7 +262,7 @@ export async function handleGojekProof(url: string, po_id: number) {
     }
 
     await browser.close();
-    // await sendToLavenderFtp(savePath, imgpath);
+    await sendToLavenderFtp(savePath, imgpath);
     return imgpath;
   } catch (error: any) {
     console.error("gojek_location_image_error:", {
