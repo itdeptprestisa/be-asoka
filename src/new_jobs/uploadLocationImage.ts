@@ -5,15 +5,20 @@ import { WaWebhook } from "../entities/WaWebhook";
 import dayjs from "dayjs";
 import dataSource from "../config/dataSource";
 import axios from "axios";
+import * as fs from "fs";
 
 import {
   createLog,
   logError,
   saveEntity,
   sendNotifOutside,
+  sendToLavenderFtp,
   waNotifHsmImage,
   waNotifHsmImageRb,
 } from "../utils";
+import path from "path";
+import * as cheerio from "cheerio";
+import puppeteer from "puppeteer";
 
 // === Save Receipt to Lavender ===
 // Mirrors Laravel helper: always sends the API endpoint string in both POST URL and body["url"]
@@ -52,19 +57,34 @@ function logsFormatter(existingLog: string, newLog: any): string {
 }
 
 // === Main Service ===
-export async function uploadLocationImage(payload: { po_id: number }) {
+export async function uploadLocationImage(payload: {
+  po_id: number;
+  courier: "BLUE BIRD" | "GOJEK";
+  img_location?: string;
+}) {
   const poRepo = dataSource.getRepository(PurchaseOrder);
   const poImageLogsRepo = dataSource.getRepository(PoImageLogs);
   const whatsappRepo = dataSource.getRepository(WaWebhook);
   const id = payload.po_id;
+  let imgpath = "";
 
   try {
     // Delivery Location Image (fallback to PO real_image)
-    const poData = await PurchaseOrder.findOne({
-      where: { id },
-      select: ["real_image"],
-    });
-    let imgpath = poData?.real_image;
+    if (payload.courier === "BLUE BIRD" && payload.img_location) {
+      imgpath = await handleBlueBirdProof(payload.img_location, payload.po_id);
+    } else if (payload.courier === "GOJEK") {
+      imgpath = await handleGojekProof(payload.img_location, payload.po_id);
+    }
+
+    if (!imgpath) {
+      const poData = await PurchaseOrder.findOne({
+        where: { id },
+        select: ["real_image"],
+      });
+      poData?.real_image;
+
+      imgpath = poData?.real_image;
+    }
 
     // === Delivery Receipt ===
     const deliveryReceiptPath = `/assets/images/delivery_receipt/po.${id}.jpg`;
@@ -172,5 +192,85 @@ export async function uploadLocationImage(payload: { po_id: number }) {
       JSON.stringify(err.message)
     );
     return { success: false, msg2: err.message };
+  }
+}
+
+async function handleBlueBirdProof(url: string, po_id: number) {
+  try {
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+    });
+
+    const fileName =
+      process.env.NODE_ENV === "production"
+        ? `po.${po_id}.png`
+        : `staging_po.${po_id}.png`;
+    let imgpath = `/assets/images/delivery_location/${fileName}`;
+
+    const savePath = path.resolve("uploads", fileName);
+    fs.writeFileSync(savePath, response.data);
+
+    await sendToLavenderFtp(savePath, imgpath);
+    return imgpath;
+  } catch (error) {
+    logError("gojek_location_image_error", error);
+    return null;
+  }
+}
+
+export async function handleGojekProof(url: string, po_id: number) {
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle2" });
+
+    // Collect all proof image src attributes (no waitForSelector)
+    const imgSrcs = await page.$$eval('img[alt="Proof"]', (imgs) =>
+      imgs.map((el) => el.getAttribute("src"))
+    );
+
+    const fileName =
+      process.env.NODE_ENV === "production"
+        ? `po.${po_id}.png`
+        : `staging_po.${po_id}.png`;
+
+    const savePath = path.resolve("uploads", fileName);
+    const imgpath = `/assets/images/delivery_location/${fileName}`;
+
+    let proofImgSrc = null;
+
+    // Prefer the second image if it exists, otherwise use the first
+    if (imgSrcs.length >= 2) {
+      proofImgSrc = imgSrcs[1];
+    } else if (imgSrcs.length === 1) {
+      proofImgSrc = imgSrcs[0];
+    }
+
+    if (proofImgSrc) {
+      const absoluteImgSrc = proofImgSrc.startsWith("http")
+        ? proofImgSrc
+        : new URL(proofImgSrc, url).href;
+
+      const response = await axios.get(absoluteImgSrc, {
+        responseType: "arraybuffer",
+      });
+      fs.writeFileSync(savePath, response.data);
+    } else {
+      // No proof images at all → fallback screenshot
+      await page.screenshot({ path: savePath, fullPage: true });
+    }
+
+    await browser.close();
+    // await sendToLavenderFtp(savePath, imgpath);
+    return imgpath;
+  } catch (error: any) {
+    console.error("gojek_location_image_error:", {
+      message: error?.message,
+      stack: error?.stack,
+    });
+    return null;
   }
 }
