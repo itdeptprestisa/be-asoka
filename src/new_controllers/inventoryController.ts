@@ -10,6 +10,7 @@ import { ProductStockEvent } from "../entities/ProductStockEvent";
 import { uploadGoodReceipt } from "../utils/spk/goodReceipt";
 import { Logs } from "../entities/Logs";
 import { InventoryGoodReceived } from "../entities/InventoryGoodReceived";
+import { ProductSupplierEvent } from "../entities/ProductSupplierEvent";
 
 export const searchSupplier = async (
   req: Request,
@@ -160,7 +161,7 @@ export const searchPo = async (
       .innerJoinAndSelect("po.orderItemsData", "orderItemsData")
       .where("product.supplier_type = :supplier_type", { supplier_type: 4 })
       .andWhere("orderItemsData.product_type = :product_type", { product_type: 2 });
-      // .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
+    // .andWhere("po.status IN (:...statuses)", { statuses: ["pending"] });
 
     // Jika ada poId, cari exact match
     if (poId) {
@@ -1213,6 +1214,117 @@ export const getGoodReceive = async (
       data: goodReceive,
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * productSupplierList
+ * Menampilkan list product + supplier bersandingan
+ * Setiap product jika beda supplier ya beda list
+ */
+export const productSupplierList = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const {
+      search = "",
+      page = "1",
+      per_page = "10",
+      sort_by = "product_id",
+      sort_dir = "ASC",
+      supplier_id = "",
+    } = req.query;
+
+    const limit = parseInt(per_page as string, 10);
+    const offset = (parseInt(page as string, 10) - 1) * limit;
+
+    // Build query
+    const qb = dataSource
+      .getRepository(ProductSupplierEvent)
+      .createQueryBuilder("pse")
+      .leftJoinAndSelect("pse.product", "product")
+      .leftJoinAndSelect("pse.supplier", "supplier");
+
+    // Filter by search (product name or product_code)
+    if (search) {
+      const s = search.toString();
+      qb.andWhere(
+        "(product.name LIKE :search OR product.product_code LIKE :search)",
+        { search: `%${s}%` }
+      );
+    }
+
+    // Filter by supplier_id
+    if (supplier_id) {
+      qb.andWhere("pse.supplier_id = :supplier_id", {
+        supplier_id: Number(supplier_id),
+      });
+    }
+
+    // Sorting
+    const allowedSortFields = [
+      "product_id",
+      "supplier_id",
+      "created_at",
+    ];
+    const sortField = allowedSortFields.includes(sort_by as string)
+      ? `pse.${sort_by}`
+      : "pse.product_id";
+    const sortDirection = sort_dir.toString().toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    qb.orderBy(sortField, sortDirection as "ASC" | "DESC");
+
+    // Pagination
+    const [data, total] = await qb
+      .skip(offset)
+      .take(limit)
+      .getManyAndCount();
+
+    // Map response
+    const result = data.map((item) => ({
+      id: item.id,
+      product_id: item.product_id,
+      supplier_id: item.supplier_id,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      product: item.product
+        ? {
+          id: item.product.id,
+          name: item.product.name,
+          product_code: item.product.product_code,
+          stock_physical: item.product.stock_physical,
+          stock_display: item.product.stock_display,
+          price: item.product.price,
+          capital_price: item.product.capital_price,
+          supplier_type: item.product.supplier_type,
+        }
+        : null,
+      supplier: item.supplier
+        ? {
+          id: item.supplier.id,
+          name: item.supplier.name,
+          phone: item.supplier.phone,
+          email: item.supplier.email,
+        }
+        : null,
+    }));
+
+    return res.json({
+      success: true,
+      data: result,
+      meta: {
+        total,
+        page: parseInt(page as string),
+        per_page: limit,
+        total_pages: Math.ceil(total / limit),
+        sort_by: sort_by,
+        sort_dir: sortDirection,
+      },
+    });
   } catch (error) {
     next(error);
   }
