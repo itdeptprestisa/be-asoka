@@ -17,5 +17,6 @@ router.post("/spk/approval/:id", controller.updateSpkStatus);
 router.post("/spk/good-receipt", controller.goodReceipt);
 router.get("/spk/good-receive-list/:spk_id", controller.getGoodReceive);
 router.get("/spk/product-supplier-list", controller.productSupplierList);
+router.post("/stock-adjustment", controller.stockAdjustment);
 
 module.exports = router;
