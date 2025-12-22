@@ -662,6 +662,17 @@ export async function gojekRequestPickupHelper(request: any) {
 
     const sumPriceOrder = orderItems.reduce((sum, item) => sum + item.price, 0);
 
+    if (
+      validPo.shipping_expedition !== "GOJEK" &&
+      validPo.shipping_expedition !== "GOCAR"
+    ) {
+      return {
+        success: false,
+        message: "Invalid shipping method type",
+        data: [],
+      };
+    }
+
     const payload = {
       paymentType: 3,
       collection_location: "pickup",
