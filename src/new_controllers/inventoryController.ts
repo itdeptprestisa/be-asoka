@@ -1329,3 +1329,157 @@ export const productSupplierList = async (
     next(error);
   }
 };
+
+export const stockAdjustment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const queryRunner = dataSource.createQueryRunner();
+
+  try {
+    const { product_id, stock_physical, stock_display } = req.body;
+
+    if (!product_id) {
+      return res.status(400).json({
+        success: false,
+        message: "product_id wajib diisi",
+      });
+    }
+
+    if (stock_physical === undefined && stock_display === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimal salah satu dari stock_physical atau stock_display harus diisi",
+      });
+    }
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    // Ambil product
+    const product = await queryRunner.manager.findOne(Products, {
+      where: { id: Number(product_id) },
+    });
+
+    if (!product) {
+      await queryRunner.rollbackTransaction();
+      return res.status(404).json({
+        success: false,
+        message: "Product tidak ditemukan",
+      });
+    }
+
+    const userId = 1;
+    const adjustmentRemarks = "Stock Adjustment";
+    const events: any[] = [];
+
+    // Handle stock_physical adjustment
+    if (stock_physical !== undefined && stock_physical !== null) {
+      const currentPhysical = Number(product.stock_physical) || 0;
+      const newPhysical = Number(stock_physical);
+      const diffPhysical = newPhysical - currentPhysical;
+
+      if (diffPhysical !== 0) {
+        // Update product stock_physical
+        product.stock_physical = newPhysical;
+
+        // Create stock event
+        const stockEventPhysical = new ProductStockEvent();
+        stockEventPhysical.product_id = product.id;
+        stockEventPhysical.user_id = userId;
+        stockEventPhysical.supplier_id = null;
+        stockEventPhysical.spk_id = 0; // No SPK for adjustment
+        stockEventPhysical.qty = Math.abs(diffPhysical);
+        stockEventPhysical.type = diffPhysical > 0 ? "plus" : "minus";
+        stockEventPhysical.stock_type = 1; // 1 = Physical
+        stockEventPhysical.stock_left = newPhysical;
+        stockEventPhysical.remarks = `${adjustmentRemarks} — Physical Stock`;
+        stockEventPhysical.category = 0;
+
+        await queryRunner.manager.save(stockEventPhysical);
+
+        events.push({
+          type: "stock_physical",
+          previous: currentPhysical,
+          new: newPhysical,
+          diff: diffPhysical,
+          adjustment: diffPhysical > 0 ? "plus" : "minus",
+        });
+      }
+    }
+
+    // Handle stock_display adjustment
+    if (stock_display !== undefined && stock_display !== null) {
+      const currentDisplay = Number(product.stock_display) || 0;
+      const newDisplay = Number(stock_display);
+      const diffDisplay = newDisplay - currentDisplay;
+
+      if (diffDisplay !== 0) {
+        // Update product stock_display
+        product.stock_display = newDisplay;
+
+        // Create stock event
+        const stockEventDisplay = new ProductStockEvent();
+        stockEventDisplay.product_id = product.id;
+        stockEventDisplay.user_id = userId;
+        stockEventDisplay.supplier_id = null;
+        stockEventDisplay.spk_id = 0; // No SPK for adjustment
+        stockEventDisplay.qty = Math.abs(diffDisplay);
+        stockEventDisplay.type = diffDisplay > 0 ? "plus" : "minus";
+        stockEventDisplay.stock_type = 2; // 2 = Display
+        stockEventDisplay.stock_left = newDisplay;
+        stockEventDisplay.remarks = `${adjustmentRemarks} — Display Stock`;
+        stockEventDisplay.category = 0;
+
+        await queryRunner.manager.save(stockEventDisplay);
+
+        events.push({
+          type: "stock_display",
+          previous: currentDisplay,
+          new: newDisplay,
+          diff: diffDisplay,
+          adjustment: diffDisplay > 0 ? "plus" : "minus",
+        });
+      }
+    }
+
+    // Save updated product
+    await queryRunner.manager.save(product);
+
+    // Create log
+    const log = new Logs();
+    log.name = `stock_adjustment_${product.id}`;
+    log.data = JSON.stringify({
+      user_id: userId,
+      product_id: product.id,
+      supplier_id: null,
+      events,
+      at: new Date().toISOString(),
+    });
+    await queryRunner.manager.save(log);
+
+    await queryRunner.commitTransaction();
+
+    return res.json({
+      success: true,
+      message: "Stock adjustment berhasil",
+      data: {
+        product_id: product.id,
+        stock_physical: product.stock_physical,
+        stock_display: product.stock_display,
+        adjustments: events,
+      },
+    });
+  } catch (err: any) {
+    await queryRunner.rollbackTransaction();
+    return res.status(500).json({
+      success: false,
+      message: "Error processing stock adjustment",
+      error: err.message,
+    });
+  } finally {
+    await queryRunner.release();
+  }
+};
+

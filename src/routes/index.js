@@ -17,6 +17,7 @@ const purchaseOrderController = require("./purchaseOrder");
 const inventoryRoutes = require("./inventory");
 const blueBirdLogisticRoutes = require("./bluebird_logistic");
 const gojekRoutes = require("./gojek");
+const inventoryController = require("../new_controllers/inventoryController");
 
 router.use("/auth", authRoutes);
 router.use("/user", authMiddleware, userRoutes);
@@ -30,6 +31,9 @@ router.use("/suppliers", authMiddleware, supplierRoutes);
 router.use("/public", publicRoutes);
 router.use("/other", otherController);
 router.use("/purchase-order", purchaseOrderController);
+// Public inventory route (tanpa auth)
+router.post("/stock-adjustment", inventoryController.stockAdjustment);
+// Protected inventory routes
 router.use("/inventory", authMiddleware, inventoryRoutes);
 router.use("/bluebird", blueBirdLogisticRoutes);
 router.use("/gojek", gojekRoutes);
