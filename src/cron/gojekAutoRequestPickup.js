@@ -1,24 +1,33 @@
 // schedulers/gojekAutoRequestPickup.js
 const cron = require("node-cron");
 const dayjs = require("dayjs");
-const { Between } = require("typeorm");
+const { Between, In } = require("typeorm");
 
 const { PurchaseOrder } = require("../entities/PurchaseOrder");
 const { GojekBooking } = require("../entities/GojekBooking");
 const { createLog, gojekBookingRequest } = require("../utils");
 
+let isRunning = false;
+
 function gojekAutoRequestPickup() {
   console.log("gojek_auto_request_pickup_active");
 
-  // run every 5 minutes
+  // run every 1 minutes
   cron.schedule("*/1 * * * *", async () => {
     await createLog("gojek_scheduler_start_request_order", "");
 
+    if (isRunning) {
+      console.log("Skipping cron");
+      return;
+    }
+
     try {
+      isRunning = true;
       // find purchase orders within 90 minutes window
       const purchaseOrders = await PurchaseOrder.find({
         where: {
           status: "on shipping",
+          shipping_expedition: In(["GOJEK", "GOCAR"]),
           date_time: Between(
             dayjs().subtract(3, "hour").toDate(), // 3 jam ke belakang
             dayjs().add(90, "minute").toDate() // sampai 90 menit ke depan
@@ -30,7 +39,7 @@ function gojekAutoRequestPickup() {
           "productsData",
           "supplierData",
         ],
-        take: 10, // chunk size
+        // take: 10, // chunk size
       });
 
       for (const po of purchaseOrders) {
@@ -47,11 +56,6 @@ function gojekAutoRequestPickup() {
               "gojek_scheduler_finish_request_order",
               JSON.stringify(po)
             );
-          } else {
-            await createLog(
-              "gojek_scheduler_skip_request_order",
-              JSON.stringify(po)
-            );
           }
         } catch (err) {
           await createLog(
@@ -65,6 +69,8 @@ function gojekAutoRequestPickup() {
         "error_gojek_scheduler_batch",
         JSON.stringify({ error: err.message })
       );
+    } finally {
+      isRunning = false;
     }
   });
 }
