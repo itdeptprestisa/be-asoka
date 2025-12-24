@@ -112,32 +112,22 @@ export async function gojekBookingRequest(
     },
   };
 
-  if (cron || dayjs().isAfter(dayjs(po.date_time).subtract(90, "minute"))) {
-    if (orderItem.shipping_expedition === "GOJEK") {
-      try {
-        const res = await gojekRequestPickupHelper(data);
-        return res;
-      } catch (err: any) {
-        await logError(
-          `gojek_request_pickup_error_po_id_${po.id}`,
-          err.message
-        );
-        return err.message;
-      }
-    } else if (orderItem.shipping_expedition === "GOCAR") {
-      try {
-        const res = await gojekRequestPickupHelper(data);
-        return res;
-      } catch (err: any) {
-        await logError(
-          `gocar_request_pickup_error_po_id_${po.id}`,
-          err.message
-        );
-        return err.message;
-      }
+  if (orderItem.shipping_expedition === "GOJEK") {
+    try {
+      const res = await gojekRequestPickupHelper(data);
+      return res;
+    } catch (err: any) {
+      await logError(`gojek_request_pickup_error_po_id_${po.id}`, err.message);
+      return err.message;
     }
-  } else {
-    return "Date time already expired";
+  } else if (orderItem.shipping_expedition === "GOCAR") {
+    try {
+      const res = await gojekRequestPickupHelper(data);
+      return res;
+    } catch (err: any) {
+      await logError(`gocar_request_pickup_error_po_id_${po.id}`, err.message);
+      return err.message;
+    }
   }
 }
 
