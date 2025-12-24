@@ -20,8 +20,8 @@ function gojekAutoRequestPickup() {
         where: {
           status: "on shipping",
           date_time: Between(
-            dayjs().toDate(),
-            dayjs().add(90, "minute").toDate()
+            dayjs().subtract(3, "hour").toDate(), // 3 jam ke belakang
+            dayjs().add(90, "minute").toDate() // sampai 90 menit ke depan
           ),
         },
         relations: [
