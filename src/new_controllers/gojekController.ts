@@ -623,7 +623,7 @@ export async function gojekRequestPickupHelper(request: any) {
   try {
     const validPo = await PurchaseOrder.findOne({
       where: { id: request.order_data.po_id, status: "on shipping" },
-      relations: ["supplierData", "customerData"],
+      relations: ["supplierData", "customerData", "orderItemsData"],
     });
 
     if (!validPo) {
@@ -644,9 +644,19 @@ export async function gojekRequestPickupHelper(request: any) {
         `gojek_booking_request_invalid_location_${request.order_data.po_id}`,
         JSON.stringify(validPo)
       );
+
+      validPo.orderItemsData.shipping_expedition = "KURIR TOKO";
+      validPo.orderItemsData.shipping_expedition_note =
+        "Lokasi tidak didukung, diluar JABODETABEK";
+      validPo.shipping_expedition = "KURIR TOKO";
+
+      await PurchaseOrder.save(validPo);
+      await OrderItems.save(validPo.orderItemsData);
+
       return {
         success: false,
-        message: "Location purchase order not valid",
+        message:
+          "Location purchase order not valid, now Shipping Expedition is set to KURIR TOKO",
         data: [],
       };
     }
