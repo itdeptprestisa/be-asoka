@@ -5,7 +5,7 @@ import dataSource from "../config/dataSource";
 import { Logs } from "../entities/Logs";
 import path from "path";
 import * as ftp from "basic-ftp";
-import * as fs from "fs";
+import { promises as fs } from "fs";
 import axios from "axios";
 
 export const haversineGreatCircleDistance = (
@@ -539,17 +539,18 @@ export async function sendToLavenderFtp(localFilePath, remoteFileName) {
     await client.uploadFrom(localFilePath, fileName);
     console.log(`Uploaded to ${remoteDir}/${fileName}`);
 
+    try {
+      await fs.unlink(localFilePath);
+      console.log("File deleted successfully");
+    } catch (unlinkErr) {
+      console.error("Failed to remove local file:", unlinkErr);
+    }
+
     return true;
   } catch (err) {
+    await logError("error_ftp", err);
     return false;
   } finally {
-    try {
-      await fs.unlink(localFilePath, () => {
-        console.log("File deleted successfully");
-      });
-    } catch (unlinkErr) {
-      console.error("Failed to remove local file: ", unlinkErr);
-    }
     client.close();
   }
 }
