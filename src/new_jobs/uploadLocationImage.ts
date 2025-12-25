@@ -115,7 +115,7 @@ export async function uploadLocationImage(payload: {
 
     // === PoImageLogs ===
     const time = { status: "ok", desc: "on-time" }; // stub for gen_std_time
-    await poImageLogsRepo.save({
+    await saveEntity(poImageLogsRepo, PoImageLogs, {
       po_id: id,
       tipe: "foto lokasi",
       status_late: time.status,
