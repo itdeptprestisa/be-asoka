@@ -76,6 +76,11 @@ export async function uploadLocationImage(payload: {
       imgpath = await handleGojekProof(payload.img_location, payload.po_id);
     }
 
+    await createLog(
+      `image_path_${id}`,
+      JSON.stringify({ imgpath, courier: payload.courier })
+    );
+
     if (!imgpath) {
       const poData = await PurchaseOrder.findOne({
         where: { id },
@@ -226,6 +231,7 @@ export async function handleGojekProof(url: string, po_id: number) {
     });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2" });
+    await createLog(`gojek_begin_scrap_${po_id}`, "");
 
     // Collect all proof image src attributes (no waitForSelector)
     const imgSrcs = await page.$$eval('img[alt="Proof"]', (imgs) =>

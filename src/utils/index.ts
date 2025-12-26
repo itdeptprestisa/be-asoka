@@ -527,6 +527,11 @@ export async function sendToLavenderFtp(
 ) {
   try {
     // API upload first
+    await createLog(
+      "begin_upload_by_api",
+      JSON.stringify({ remoteFileName, url: process.env.LAVENDER_BASE_URL })
+    );
+
     const form = new FormData();
     form.append("path", remoteFileName);
     form.append(
@@ -545,6 +550,8 @@ export async function sendToLavenderFtp(
         },
       }
     );
+
+    await createLog("success_upload_image_api", remoteFileName);
 
     await fs.unlink(localFilePath);
     return true;
