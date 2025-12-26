@@ -68,7 +68,7 @@ function gojekAutoRequestPickup() {
           if (!latestBooking) {
             await gojekBookingRequest(po, null, true);
             await createLog(
-              "gojek_scheduler_finish_request_order",
+              `gojek_scheduler_finish_request_order_asoka_${po.id}`,
               JSON.stringify(po)
             );
           }

@@ -571,6 +571,7 @@ export const requestPickupOrder = async (
       });
     }
 
+    await createLog(`gojek_manual_request_pickup_${req.body.po_id}`, "");
     const result = await gojekBookingRequest(poData);
 
     if (result.success) {
