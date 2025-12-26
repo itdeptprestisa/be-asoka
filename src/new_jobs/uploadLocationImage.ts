@@ -235,10 +235,13 @@ export async function handleGojekProof(url: string, po_id: number) {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
       ],
     });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2" });
+    await page.waitForSelector('img[alt="Proof"]', { timeout: 30000 });
     await createLog(`gojek_begin_scrap_${po_id}`, "");
 
     // Collect all proof image src attributes (no waitForSelector)
