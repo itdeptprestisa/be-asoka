@@ -6,7 +6,9 @@ import { Logs } from "../entities/Logs";
 import path from "path";
 import * as ftp from "basic-ftp";
 import { promises as fs } from "fs";
+import * as commonFs from "fs";
 import axios from "axios";
+import FormData from "form-data";
 
 export const haversineGreatCircleDistance = (
   lat1: number,
@@ -519,39 +521,64 @@ export const logError = async (context: string, error: any) => {
   );
 };
 
-export async function sendToLavenderFtp(localFilePath, remoteFileName) {
-  const client = new ftp.Client();
-  client.ftp.verbose = true;
-
+export async function sendToLavenderFtp(
+  localFilePath: string,
+  remoteFileName: string
+) {
   try {
-    await client.access({
-      host: "lavender.prestisa.id",
-      user: process.env.FTP_USERNAME,
-      password: process.env.FTP_PASSWORD,
-      port: 21,
-      secure: false,
-    });
+    // API upload first
+    const form = new FormData();
+    form.append("path", remoteFileName);
+    form.append(
+      "file",
+      commonFs.createReadStream(localFilePath),
+      path.basename(localFilePath)
+    );
 
-    const remoteDir = path.posix.dirname(remoteFileName);
-    const fileName = path.posix.basename(remoteFileName);
+    await axios.post(
+      process.env.LAVENDER_BASE_URL + "/customer-web/image-uploader",
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          "lavender-asset-uploader": "upload-when-fail",
+        },
+      }
+    );
 
-    await client.cd(remoteDir);
-    await client.uploadFrom(localFilePath, fileName);
-    console.log(`Uploaded to ${remoteDir}/${fileName}`);
+    await fs.unlink(localFilePath);
+    return true;
+  } catch (apiErr) {
+    // FTP fallback
+    const client = new ftp.Client();
+    client.ftp.verbose = true;
 
     try {
-      await fs.unlink(localFilePath);
-      console.log("File deleted successfully");
-    } catch (unlinkErr) {
-      console.error("Failed to remove local file:", unlinkErr);
-    }
+      await createLog("retry_upload_by_ftp", "");
 
-    return true;
-  } catch (err) {
-    await logError("error_ftp", err);
-    return false;
-  } finally {
-    client.close();
+      await client.access({
+        host: "lavender.prestisa.id",
+        user: process.env.FTP_USERNAME,
+        password: process.env.FTP_PASSWORD,
+        port: 21,
+        secure: false,
+      });
+
+      const remoteDir = path.posix.dirname(remoteFileName);
+      const fileName = path.posix.basename(remoteFileName);
+
+      await client.cd(remoteDir);
+      await client.uploadFrom(localFilePath, fileName);
+      console.log(`Uploaded to ${remoteDir}/${fileName} via FTP`);
+
+      await fs.unlink(localFilePath);
+      return true;
+    } catch (ftpErr) {
+      await logError("error_upload", { apiError: apiErr, ftpError: ftpErr });
+      return false;
+    } finally {
+      client.close();
+    }
   }
 }
 
