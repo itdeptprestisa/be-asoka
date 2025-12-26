@@ -271,6 +271,7 @@ export async function handleGojekProof(url: string, po_id: number) {
     await sendToLavenderFtp(savePath, imgpath);
     return imgpath;
   } catch (error: any) {
+    await logError("gojek_location_image_error", error);
     console.error("gojek_location_image_error:", {
       message: error?.message,
       stack: error?.stack,
