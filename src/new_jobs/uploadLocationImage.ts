@@ -226,8 +226,16 @@ async function handleBlueBirdProof(url: string, po_id: number) {
 export async function handleGojekProof(url: string, po_id: number) {
   try {
     const browser = await puppeteer.launch({
+      executablePath:
+        process.env.NODE_ENV === "development"
+          ? undefined
+          : "/home/asoka-be/chrome-linux64/chrome",
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
     });
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: "networkidle2" });
